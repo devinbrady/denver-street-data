@@ -1,3 +1,9 @@
+# Ignore CSV files in the data directory
+data/*.csv
+
+# Ignore the Mac DS_Store file
+.DS_Store
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
