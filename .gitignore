@@ -1,6 +1,9 @@
 # Ignore CSV files in the data directory
 data/*.csv
 
+# Ignore everything in the shapefiles directory
+shapefiles/
+
 # Ignore the Mac DS_Store file
 .DS_Store
 
