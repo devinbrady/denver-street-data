@@ -38,7 +38,30 @@ class CrashDataAnalysis():
         if verbose:
             print(f'Reading file: {csv_file}')
         
-        df = pd.read_csv(csv_file, low_memory=False)
+        columns_to_read = [
+            'incident_id'
+            , 'top_traffic_accident_offense'
+            , 'reported_date'
+            , 'incident_address'
+            , 'geo_lon'
+            , 'geo_lat'
+            , 'neighborhood_id'
+            , 'bicycle_ind'
+            , 'pedestrian_ind'
+            , 'SERIOUSLY_INJURED'
+            , 'FATALITIES'
+        ]
+
+        df = pd.read_csv(csv_file, low_memory=False, usecols=columns_to_read)
+
+        # Manually add a crash that is not yet reflected in the database
+        # crash_to_add = pd.DataFrame({
+        #     'top_traffic_accident_offense': 'FATAL'
+        #     , 'reported_date': '2022-05-17 22:00:00'
+        #     , 'incident_id': '999'
+        # }, index=[0])
+        # df = pd.concat([df, crash_to_add], ignore_index=True)
+
 
         # There's one bad row with a NULL incident_id
         df = df[df.incident_id.notnull()].copy()
@@ -55,6 +78,12 @@ class CrashDataAnalysis():
             df[d] = pd.to_datetime(df[d])
 
         date_field_name = 'reported_date'
+        df[date_field_name] = df[date_field_name].dt.tz_localize(
+                pytz.timezone('America/Denver')
+                , ambiguous=True
+                , nonexistent='shift_forward'
+                )
+
         df['crash_date_str'] = df[date_field_name].dt.strftime('%Y-%m-%d %a')
         df['crash_time_str'] = df[date_field_name].dt.strftime('%a %b %-d, %-I:%M %p')
         df['crash_year'] = df[date_field_name].dt.year
@@ -62,10 +91,16 @@ class CrashDataAnalysis():
         df['one'] = 1
         df = df.sort_values(by=date_field_name)
 
-        df.drop(columns='shape', inplace=True)
-
         if verbose:
-            print(f'Max timestamp: {df[date_field_name].max()}')
+            max_timestamp = df[date_field_name].max()
+            max_timestamp_str = max_timestamp.strftime('%a %b %-d, %-I:%M %p')
+
+            days_ago = (self.denver_timestamp() - max_timestamp).total_seconds() / 60 / 60 / 24
+
+            print(f'Max timestamp: {max_timestamp_str} ({days_ago:.2f} days ago)')
+
+            this_year_fatality_crashes = df[df.crash_year == self.denver_timestamp().year].fatality.sum()
+            print(f'Fatality crashes this year: {this_year_fatality_crashes}')
 
         return df
 
@@ -109,11 +144,7 @@ class CrashDataAnalysis():
         f = df[df.fatality].copy()
         f['days_between'] = (f['reported_date'] - f['reported_date'].shift(1)).dt.total_seconds() / 60 / 60 / 24
 
-        tz = pytz.timezone('America/Denver')
-        denver_timestamp = datetime.now(tz)
-
-        f['reported_date_tz'] = f['reported_date'].dt.tz_localize(tz)
-        f['days_ago'] = (denver_timestamp - f['reported_date_tz']).dt.total_seconds() / 60 / 60 / 24
+        f['days_ago'] = (self.denver_timestamp() - f['reported_date']).dt.total_seconds() / 60 / 60 / 24
 
         recent_f = f.tail(20)
         print(recent_f[['incident_address', 'neighborhood_id', 'crash_time_str', 'days_between', 'days_ago']].to_string(index=False))
@@ -176,7 +207,7 @@ class CrashDataAnalysis():
 
 
 
-    def crashes_near_point(self, df, lat, lon, radius_miles=1):
+    def crashes_near_point(self, df, lat, lon, radius_miles=1, verbose=False):
         """
         Return a subset of the crash dataframe where the crashes occured near a point
         """
@@ -187,8 +218,16 @@ class CrashDataAnalysis():
         df['distance_miles'] = self.pythagorean_distance(df['geo_lat'], df['geo_lon'], df['target_lat'], df['target_lon'])
 
         recent = df[df['distance_miles'] < radius_miles].tail(20)
-        print(recent[['incident_address', 'distance_miles', 'crash_time_str', 'top_traffic_accident_offense']].to_string(index=False))
+
+        if verbose:
+            print(recent[['incident_address', 'distance_miles', 'crash_time_str', 'top_traffic_accident_offense']].to_string(index=False))
 
         return df
+
+
+
+    def denver_timestamp(self):
+
+        return datetime.now(tz=pytz.timezone('America/Denver'))
 
 
