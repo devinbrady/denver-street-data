@@ -1,5 +1,6 @@
-# Ignore CSV files in the data directory
+# Ignore CSV and database files in the data directory
 data/*.csv
+data/*.db
 
 # Ignore everything in the shapefiles directory
 shapefiles/

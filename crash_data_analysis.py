@@ -18,7 +18,7 @@ class CrashDataAnalysis():
 
 
 
-    def crash_dataframe(self, csv_file=None, verbose=False):
+    def crash_dataframe(self, csv_file=None, verbose=False, all_columns=False):
         """
         Wrapper for read_and_preprocess_crash_data()
         """
@@ -26,11 +26,11 @@ class CrashDataAnalysis():
         if not csv_file:
             csv_file = self.most_recent_file()
 
-        return self.read_and_preprocess_crash_data(csv_file, verbose=verbose)
+        return self.read_and_preprocess_crash_data(csv_file, verbose=verbose, all_columns=all_columns)
 
 
 
-    def read_and_preprocess_crash_data(self, csv_file, verbose=False):
+    def read_and_preprocess_crash_data(self, csv_file, verbose=False, all_columns=False):
         """
         Read in the most recent CSV file of crash data and return a cleaned DataFrame
         """
@@ -52,7 +52,10 @@ class CrashDataAnalysis():
             , 'FATALITIES'
         ]
 
-        df = pd.read_csv(csv_file, low_memory=False, usecols=columns_to_read)
+        if all_columns:
+            df = pd.read_csv(csv_file, low_memory=False)
+        else:
+            df = pd.read_csv(csv_file, low_memory=False, usecols=columns_to_read)
 
         # Manually add a crash that is not yet reflected in the database
         # crash_to_add = pd.DataFrame({
@@ -85,6 +88,7 @@ class CrashDataAnalysis():
                 )
 
         df['crash_date_str'] = df[date_field_name].dt.strftime('%Y-%m-%d %a')
+        # df['crash_month_day'] = df[date_field_name].dt.strftime('%m-%d')
         df['crash_time_str'] = df[date_field_name].dt.strftime('%a %b %-d, %-I:%M %p')
         df['crash_year'] = df[date_field_name].dt.year
         df['crash_day_of_year'] = df[date_field_name].dt.day_of_year
@@ -99,8 +103,8 @@ class CrashDataAnalysis():
 
             print(f'Max timestamp: {max_timestamp_str} ({days_ago:.2f} days ago)')
 
-            this_year_fatality_crashes = df[df.crash_year == self.denver_timestamp().year].fatality.sum()
-            print(f'Fatality crashes this year: {this_year_fatality_crashes}')
+            this_year_deadly_crashes = df[df.crash_year == self.denver_timestamp().year].fatality.sum()
+            print(f'Deadly crashes this year: {this_year_deadly_crashes}')
 
         return df
 
@@ -139,7 +143,7 @@ class CrashDataAnalysis():
 
 
 
-    def recent_fatality_crashes(self, df):
+    def recent_deadly_crashes(self, df):
 
         f = df[df.fatality].copy()
         f['days_between'] = (f['reported_date'] - f['reported_date'].shift(1)).dt.total_seconds() / 60 / 60 / 24
@@ -212,6 +216,8 @@ class CrashDataAnalysis():
         Return a subset of the crash dataframe where the crashes occured near a point
         """
 
+        df = df.copy()
+
         df['target_lat'] = lat
         df['target_lon'] = lon
 
@@ -222,7 +228,7 @@ class CrashDataAnalysis():
         if verbose:
             print(recent[['incident_address', 'distance_miles', 'crash_time_str', 'top_traffic_accident_offense']].to_string(index=False))
 
-        return df
+        return recent
 
 
 
