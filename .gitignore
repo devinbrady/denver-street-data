@@ -1,6 +1,8 @@
 # Ignore CSV and database files in the data directory
 data/*.csv
 data/*.db
+data/*.sqlite
+data/remote_header_etag.txt
 
 # Ignore everything in the shapefiles directory
 shapefiles/

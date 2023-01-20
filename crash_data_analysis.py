@@ -87,6 +87,7 @@ class CrashDataAnalysis():
                 , nonexistent='shift_forward'
                 )
 
+        df['crash_date'] = df[date_field_name].dt.strftime('%Y-%m-%d')
         df['crash_date_str'] = df[date_field_name].dt.strftime('%Y-%m-%d %a')
         # df['crash_month_day'] = df[date_field_name].dt.strftime('%m-%d')
         df['crash_time_str'] = df[date_field_name].dt.strftime('%a %b %-d, %-I:%M %p')
@@ -223,7 +224,7 @@ class CrashDataAnalysis():
 
         df['distance_miles'] = self.pythagorean_distance(df['geo_lat'], df['geo_lon'], df['target_lat'], df['target_lon'])
 
-        recent = df[df['distance_miles'] < radius_miles].tail(20)
+        recent = df[df['distance_miles'] < radius_miles]
 
         if verbose:
             print(recent[['incident_address', 'distance_miles', 'crash_time_str', 'top_traffic_accident_offense']].to_string(index=False))

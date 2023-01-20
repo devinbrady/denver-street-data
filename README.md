@@ -14,3 +14,7 @@ It shows that deadly crashes stopped at the onset of the pandemic in 2020 (green
 ![deadly_crashes_barplot](images/deadly_crashes_barplot.png)
 
 2022 is projected to have more deadly crashes in Denver than any year on record. By July 4, 2022, there have been 42 deadly crashes, matching the total for all of 2013. 
+
+## Data Source
+
+The data comes from the "Traffic Accidents" dataset maintained by the City of Denver: [https://denvergov.org/opendata/dataset/city-and-county-of-denver-traffic-accidents](https://denvergov.org/opendata/dataset/city-and-county-of-denver-traffic-accidents)

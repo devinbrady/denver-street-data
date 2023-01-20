@@ -2,91 +2,109 @@
 
 import os
 import pytz
+import argparse
+import requests
 import pandas as pd
+import sqlite3 as sq
+from pathlib import Path
 from datetime import datetime
 
-import argparse
-parser = argparse.ArgumentParser()
-parser.add_argument('-f', '--force-refresh', action='store_true', help='Download a copy even if it has already happened today')
-args = parser.parse_args()
-
-tz = pytz.timezone('America/Denver')
-time_format_string = '%Y_%m_%d__%H_%M'
 
 
-def current_time():
+class SnapshotCrashData():
 
-    now_local = datetime.now(tz)
-    
-    # Hour of day: '%-I:%M %p'
-    # Day of month, year: '%B %-d, %Y')
-    return now_local.strftime(time_format_string)
+    def __init__(self):
 
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-f', '--force-refresh', action='store_true', help='Download a copy even if it has already happened today')
+        self.args = parser.parse_args()
 
+        self.header_file = Path('data/remote_header_etag.txt')
+        if not self.header_file.exists():
+            with open(self.header_file, 'w') as f:
+                f.write('remote_header_has_not_yet_been_downloaded')
 
-def file_has_been_downloaded_today():
+        self.url = 'https://www.denvergov.org/media/gis/DataCatalog/traffic_accidents/csv/traffic_accidents.csv'
 
-    now_local = datetime.now(tz)
-    today = now_local.strftime('%Y_%m_%d')
+        self.tz = pytz.timezone('America/Denver')
 
-    snapshots = os.listdir('data/')
-    
-    todays_snapshots = [f for f in snapshots if today in f]
-
-    return len(todays_snapshots) > 0
+        # Hour of day: '%-I:%M %p'
+        # Day of month, year: '%B %-d, %Y')
+        self.time_format_string = '%Y_%m_%d__%H_%M'
 
 
 
-def list_all_files():
+    def current_time(self):
 
-    return sorted(['data/' + f for f in os.listdir('data/') if '.csv' in f])
-
-
-
-def most_recent_file():
-    """
-    Return the name of the most recent file
-    """
-
-    return list_all_files()[-1]
+        now_local = datetime.now(self.tz)
+        
+        return now_local.strftime(self.time_format_string)
 
 
-def timestamp_of_most_recent_file():
 
-    return datetime.strptime(most_recent_file(), f'data/denver_crashes_{time_format_string}.csv')
-    
+    def remote_file_has_new_header(self):
+        """
+        Return True if the remote header has a ETag value that is different from the local version
+        """
+
+        with open(self.header_file, 'r') as f:
+            old_header_etag = f.read()
+
+        r = requests.head(self.url)
+        self.remote_header_etag = r.headers['ETag']
+
+        return self.remote_header_etag != old_header_etag
+        
 
 
-def download_file():
+    def write_new_etag_to_file(self):
+        """Write the ETag from the remote header file to the local text file"""
 
-    print('Downloading data from denvergov... ', end='')
+        with open(self.header_file, 'w') as f:
+            f.write(self.remote_header_etag)
 
-    df = pd.read_csv(
-        'https://www.denvergov.org/media/gis/DataCatalog/traffic_accidents/csv/traffic_accidents.csv'
-        , low_memory=False
-        )
 
-    print('complete.')
 
-    snapshot_filename = f'data/denver_crashes_{current_time()}.csv'
-    df.to_csv(snapshot_filename, index=False)
+    def download_file(self):
 
-    print(f'Snapshot saved to: {snapshot_filename}')
+        print('Downloading data from denvergov... ', end='')
 
-    number_of_crashes = len(df)
-    print(f'Crashes in dataset: {number_of_crashes:,}')
+        conn = sq.connect('data/denver_crashes.sqlite')
+
+        df = pd.read_csv(self.url, low_memory=False)
+
+        print('complete.')
+
+        df.to_sql('crashes', conn, if_exists='replace')
+        conn.close()
+        print(f'Snapshot saved to: denver_crashes.sqlite')
+        
+        # snapshot_filename = f'data/denver_crashes_{self.current_time()}.csv'
+        # df.to_csv(snapshot_filename, index=False)
+
+        # print(f'Snapshot saved to: {snapshot_filename}')
+
+        number_of_crashes = len(df)
+        print(f'Crashes in dataset: {number_of_crashes:,}')
+
+        self.write_new_etag_to_file()
+
+
+
+    def run(self):
+
+        current_timestamp = datetime.now(self.tz).strftime('%Y-%m-%d %H:%M:%S %Z')
+        print(f'{current_timestamp} -> ', end='')
+
+        if (self.remote_file_has_new_header()) or (self.args.force_refresh):
+            self.download_file()
+        else:
+            print('Local data matches remote data.')
 
 
 
 if __name__ == '__main__':
 
+    scd = SnapshotCrashData()
+    scd.run()
 
-    # print(datetime.now(tz) - timestamp_of_most_recent_file())
-
-    current_timestamp = datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S %Z')
-    print(f'{current_timestamp} -> ', end='')
-
-    if (not file_has_been_downloaded_today()) or (args.force_refresh):
-        download_file()
-    else:
-        print('The crash dataset has already been downloaded today.')
