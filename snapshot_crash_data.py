@@ -2,12 +2,16 @@
 
 import os
 import pytz
+import time
 import argparse
 import requests
+import subprocess
 import pandas as pd
 import sqlite3 as sq
 from pathlib import Path
 from datetime import datetime
+
+from crash_data_analysis import CrashDataAnalysis
 
 
 
@@ -17,6 +21,7 @@ class SnapshotCrashData():
 
         parser = argparse.ArgumentParser()
         parser.add_argument('-f', '--force-refresh', action='store_true', help='Download a copy even if it has already happened today')
+        parser.add_argument('-p', '--postgres', action='store_true', help='Preprocess the local raw file and upload to postgres')
         self.args = parser.parse_args()
 
         self.header_file = Path('data/remote_header_etag.txt')
@@ -50,8 +55,16 @@ class SnapshotCrashData():
         with open(self.header_file, 'r') as f:
             old_header_etag = f.read()
 
-        r = requests.head(self.url)
+        try:
+            r = requests.head(self.url)
+        except Exception as e:
+            print('Something went wrong accessing the remote file, so we will not try to download it.')
+            return False
+        
         self.remote_header_etag = r.headers['ETag']
+
+        if self.remote_header_etag == old_header_etag:
+            print('Local data matches remote data.')
 
         return self.remote_header_etag != old_header_etag
         
@@ -71,23 +84,54 @@ class SnapshotCrashData():
 
         conn = sq.connect('data/denver_crashes.sqlite')
 
-        df = pd.read_csv(self.url, low_memory=False)
+        try:
+            df = pd.read_csv(self.url, low_memory=False)
+        except Exception as e:
+            print('Something went wrong trying to download the CSV. Quitting.')
+            return
 
         print('complete.')
 
-        df.to_sql('crashes', conn, if_exists='replace')
-        conn.close()
-        print(f'Snapshot saved to: denver_crashes.sqlite')
-        
-        # snapshot_filename = f'data/denver_crashes_{self.current_time()}.csv'
-        # df.to_csv(snapshot_filename, index=False)
+        df['updated_at'] = datetime.now(pytz.timezone('UTC')).strftime('%Y-%m-%d %H:%M %Z')
 
-        # print(f'Snapshot saved to: {snapshot_filename}')
+        df.to_sql('crashes_raw', conn, if_exists='replace')
+        df.to_csv('data/raw_crash_data.csv', index=False)
+
+        print(f'Raw data saved to: denver_crashes.sqlite, table: crashes_raw')
+
+        cda = CrashDataAnalysis()
+        df_preprocessed = cda.preprocess_crash_data(df=df, verbose=False, all_columns=False)
+        df_preprocessed.to_sql('crashes', conn, if_exists='replace')
+
+        df_preprocessed.to_csv('data/preprocessed_crash_data.csv', index=False)
+        print(f'Pre-processed data saved to: denver_crashes.sqlite, table: crashes')
+        conn.close()
 
         number_of_crashes = len(df)
         print(f'Crashes in dataset: {number_of_crashes:,}')
 
         self.write_new_etag_to_file()
+
+
+
+    def push_to_postgres(self):
+        """
+        Push the most recent local data to Postgres
+        """
+
+        start = time.perf_counter()
+
+        with subprocess.Popen(
+            'psql -h p.c67mkspmgrfnlij3755lv5ngnu.db.postgresbridge.com -d postgres -U postgres -p 5432 -a -q -f postgres_create_table_crashes.sql'
+            , shell=True
+            , stdout=subprocess.PIPE
+            ) as proc:
+
+            output = proc.stdout.read()
+
+        end = time.perf_counter()
+        seconds = (end-start)
+        print(f'Copy to Postgres complete. Elapsed time: {seconds:0.1f} seconds')
 
 
 
@@ -98,8 +142,14 @@ class SnapshotCrashData():
 
         if (self.remote_file_has_new_header()) or (self.args.force_refresh):
             self.download_file()
-        else:
-            print('Local data matches remote data.')
+
+        if self.args.postgres:
+            try:
+                self.push_to_postgres()
+            except Exception as e:
+                print('Push to remote postgres server failed with this error:')
+                print(e)
+                return
 
 
 

@@ -4,6 +4,8 @@ import pytz
 import hashlib
 import numpy as np
 import pandas as pd
+import sqlite3 as sq
+import psycopg2 as pg
 import geopy.distance
 import geopandas as gpd
 from datetime import datetime
@@ -14,29 +16,51 @@ from shapely.geometry import Point
 class CrashDataAnalysis():
 
     def __init__(self):
-        pass
+        
+        conn_sqlite = sq.connect('data/denver_crashes.sqlite')
+        
+        postgres_connected = False
+        try:
+            conn_postgres = pg.connect(f"host=p.c67mkspmgrfnlij3755lv5ngnu.db.postgresbridge.com dbname=postgres user=postgres password={os.environ['PGPASSWORD']}")
+            postgres_connected = True
+        except:
+            print('No postgres connection.')
+
+        if postgres_connected:
+            self.conn = conn_postgres
+        else:
+            self.conn = conn_sqlite
+
+        self.local_timezone = pytz.timezone('America/Denver')
 
 
 
     def crash_dataframe(self, csv_file=None, verbose=False, all_columns=False):
         """
-        Wrapper for read_and_preprocess_crash_data()
+        Wrapper for preprocess_crash_data()
         """
 
-        if not csv_file:
-            csv_file = self.most_recent_file()
+        df = self.read_crash_data(verbose)
 
-        return self.read_and_preprocess_crash_data(csv_file, verbose=verbose, all_columns=all_columns)
-
+        return self.preprocess_crash_data(df, verbose=verbose, all_columns=all_columns)
 
 
-    def read_and_preprocess_crash_data(self, csv_file, verbose=False, all_columns=False):
+
+    def read_crash_data(self, verbose=False):
+
+        if verbose:
+            print(f'Reading file: data/denver_crashes.sqlite')
+        
+        df = pd.read_sql('select * from crashes_raw', self.conn)
+
+        return df
+
+
+
+    def preprocess_crash_data(self, df, verbose=False, all_columns=False):
         """
         Read in the most recent CSV file of crash data and return a cleaned DataFrame
         """
-
-        if verbose:
-            print(f'Reading file: {csv_file}')
         
         columns_to_read = [
             'incident_id'
@@ -48,14 +72,16 @@ class CrashDataAnalysis():
             , 'neighborhood_id'
             , 'bicycle_ind'
             , 'pedestrian_ind'
-            , 'SERIOUSLY_INJURED'
-            , 'FATALITIES'
+            # , 'SERIOUSLY_INJURED'
+            # , 'FATALITIES'
+            , 'updated_at'
         ]
 
-        if all_columns:
-            df = pd.read_csv(csv_file, low_memory=False)
-        else:
-            df = pd.read_csv(csv_file, low_memory=False, usecols=columns_to_read)
+        if not all_columns:
+            df = df[columns_to_read].copy()
+
+        df['bicycle_ind'] = df['bicycle_ind'].fillna(0)
+        df['pedestrian_ind'] = df['pedestrian_ind'].fillna(0)
 
         # Manually add a crash that is not yet reflected in the database
         # crash_to_add = pd.DataFrame({
@@ -75,14 +101,16 @@ class CrashDataAnalysis():
         df['fatality'] = df['top_traffic_accident_offense'].str.contains('FATAL')
         df['sbi_or_fatality'] = (df['sbi']) | (df['fatality'])
 
-        date_fields = [c for c in df.columns if '_date' in c.lower()]
+        date_fields = [c for c in df.columns if '_date' in c.lower()] + ['updated_at']
 
         for d in date_fields:
             df[d] = pd.to_datetime(df[d])
 
         date_field_name = 'reported_date'
+        # todo: sqlite/pandas seems to read this tz-ambiguous field in the local timezone
+        # when I switch this to postgres, might have to be more explicit about timezones
         df[date_field_name] = df[date_field_name].dt.tz_localize(
-                pytz.timezone('America/Denver')
+                self.local_timezone
                 , ambiguous=True
                 , nonexistent='shift_forward'
                 )
@@ -93,16 +121,22 @@ class CrashDataAnalysis():
         df['crash_time_str'] = df[date_field_name].dt.strftime('%a %b %-d, %-I:%M %p')
         df['crash_year'] = df[date_field_name].dt.year
         df['crash_day_of_year'] = df[date_field_name].dt.day_of_year
-        df['one'] = 1
         df = df.sort_values(by=date_field_name)
 
+        df.drop_duplicates(subset=['incident_id'], inplace=True)
+
         if verbose:
+
+            updated_at = df['updated_at'].dt.tz_convert(self.local_timezone).max()
+            updated_at_str = updated_at.strftime('%a %b %-d, %-I:%M %p')
+            print(f'Local database updated at: {updated_at_str}')
+
             max_timestamp = df[date_field_name].max()
             max_timestamp_str = max_timestamp.strftime('%a %b %-d, %-I:%M %p')
 
             days_ago = (self.denver_timestamp() - max_timestamp).total_seconds() / 60 / 60 / 24
 
-            print(f'Max timestamp: {max_timestamp_str} ({days_ago:.2f} days ago)')
+            print(f'Max timestamp in database: {max_timestamp_str} ({days_ago:.2f} days ago)')
 
             this_year_deadly_crashes = df[df.crash_year == self.denver_timestamp().year].fatality.sum()
             print(f'Deadly crashes this year: {this_year_deadly_crashes}')
@@ -144,15 +178,42 @@ class CrashDataAnalysis():
 
 
 
-    def recent_deadly_crashes(self, df):
+    def recent_deadly_crashes(self):
+        """
+        Return dataframe with info about recent deadly crashes
+        """
 
-        f = df[df.fatality].copy()
-        f['days_between'] = (f['reported_date'] - f['reported_date'].shift(1)).dt.total_seconds() / 60 / 60 / 24
+        columns_to_query = ['incident_address', 'neighborhood_id', 'crash_time_str', 'pedestrian_ind', 'bicycle_ind']
+        
+        query = f"""
+            select
+            reported_date,
+            {','.join(columns_to_query)}
+            from crashes
 
-        f['days_ago'] = (self.denver_timestamp() - f['reported_date']).dt.total_seconds() / 60 / 60 / 24
+            where fatality
+
+            order by reported_date
+        """
+
+        f = pd.read_sql(query, self.conn)
+
+        f['pedestrian'] = f['pedestrian_ind'].apply(lambda row: '' if row == 0 else 'x')
+        f['bicycle'] = f['bicycle_ind'].apply(lambda row: '' if row == 0 else 'x')
+
+        # f['reported_date'] = pd.to_datetime(f['reported_date'])
+        
+        # f['days_between'] = (f['reported_date'] - f['reported_date'].shift(1)).dt.total_seconds() / 60 / 60 / 24
+
+        # f['now'] = self.denver_timestamp()
+        # f['days_ago'] = f['now'] - f['reported_date']
+        # print(f['reported_date'])
+        # f['days_ago'] = (self.denver_timestamp() - f['reported_date']).dt.total_seconds() / 60 / 60 / 24
 
         recent_f = f.tail(20)
-        print(recent_f[['incident_address', 'neighborhood_id', 'crash_time_str', 'days_between', 'days_ago']].to_string(index=False))
+
+        columns_to_print = ['crash_time_str', 'pedestrian', 'bicycle', 'incident_address', 'neighborhood_id']
+        # print(recent_f[columns_to_print].to_string(index=False))
 
         return f
 
