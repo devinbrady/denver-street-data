@@ -121,8 +121,13 @@ class SnapshotCrashData():
 
         start = time.perf_counter()
 
+        pg_host = os.environ['PGHOST']
+        pg_database = os.environ['PGDATABASE']
+        pg_username = os.environ['PGUSERNAME']
+        pg_port = os.environ['PGPORT']
+
         with subprocess.Popen(
-            'psql -h p.c67mkspmgrfnlij3755lv5ngnu.db.postgresbridge.com -d postgres -U postgres -p 5432 -a -q -f postgres_create_table_crashes.sql'
+            f'psql -h {pg_host} -d {pg_database} -U {pg_username} -p {pg_port} -a -q -f postgres_create_table_crashes.sql'
             , shell=True
             , stdout=subprocess.PIPE
             ) as proc:

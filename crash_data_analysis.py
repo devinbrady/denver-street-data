@@ -21,7 +21,7 @@ class CrashDataAnalysis():
         
         postgres_connected = False
         try:
-            conn_postgres = pg.connect(f"host=p.c67mkspmgrfnlij3755lv5ngnu.db.postgresbridge.com dbname=postgres user=postgres password={os.environ['PGPASSWORD']}")
+            conn_postgres = self.connect_to_postgres()
             postgres_connected = True
         except:
             print('No postgres connection.')
@@ -32,6 +32,19 @@ class CrashDataAnalysis():
             self.conn = conn_sqlite
 
         self.local_timezone = pytz.timezone('America/Denver')
+
+
+    def connect_to_postgres(self):
+
+        pg_host = os.environ['PGHOST']
+        pg_database = os.environ['PGDATABASE']
+        pg_username = os.environ['PGUSERNAME']
+        pg_port = os.environ['PGPORT']
+        pg_password = os.environ['PGPASSWORD']
+
+        conn = pg.connect(f"host={pg_host} dbname={pg_database} user={pg_username} password={pg_password}")
+
+        return conn
 
 
 
