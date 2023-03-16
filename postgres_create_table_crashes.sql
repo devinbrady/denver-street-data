@@ -35,5 +35,6 @@ CREATE INDEX crashes_geom_gist
 
 UPDATE crashes SET geom = ST_GeomFromText('POINT(' || geo_lon || ' ' || geo_lat || ')',4326);
 UPDATE crashes SET geom_denver = ST_Transform(geom,3502);
+CREATE INDEX crashes_geom_denver_gist ON crashes USING gist(geom_denver);
 
 ANALYZE crashes;

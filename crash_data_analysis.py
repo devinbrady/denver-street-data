@@ -48,6 +48,16 @@ class CrashDataAnalysis():
 
 
 
+    def most_recent_crash_timestamp(self):
+        """Return timestamp in local time showing the most recent crash in the dataset"""
+
+        return pd.to_datetime(
+            pd.read_sql('select max(reported_date) from crashes', self.conn).iloc[0].values[0]
+        ).tz_localize('UTC').tz_convert('America/Denver')
+
+
+
+
     def crash_dataframe(self, csv_file=None, verbose=False, all_columns=False):
         """
         Wrapper for preprocess_crash_data()

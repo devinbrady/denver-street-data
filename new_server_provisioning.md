@@ -21,3 +21,5 @@
 
         shp2pgsql -s 4326 -I shapefiles/street_routes/street_routes.shp | psql -h "$PGHOST" -d "$PGDATABASE" -U "$PGUSERNAME" -p "$PGPORT"
         shp2pgsql -s 4326 -I shapefiles/street_centerline/street_centerline.shp | psql -h "$PGHOST" -d "$PGDATABASE" -U "$PGUSERNAME" -p "$PGPORT"
+        shp2pgsql -s 4326 -I shapefiles/intersections/intersections.shp | psql -h "$PGHOST" -d "$PGDATABASE" -U "$PGUSERNAME" -p "$PGPORT"
+        shp2pgsql -s 4326 -I shapefiles/statistical_neighborhoods/statistical_neighborhoods.shp | psql -h "$PGHOST" -d "$PGDATABASE" -U "$PGUSERNAME" -p "$PGPORT"

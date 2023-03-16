@@ -4,6 +4,9 @@ data/*.db
 data/*.sqlite
 data/remote_header_etag.txt
 
+# Ignore the video directories
+video_*/
+
 # Ignore everything in the shapefiles directory
 shapefiles/
 
