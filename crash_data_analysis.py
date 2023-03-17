@@ -33,6 +33,29 @@ class CrashDataAnalysis():
 
         self.local_timezone = pytz.timezone('America/Denver')
 
+        self.crash_table_fields = [
+            'incident_id'
+            , 'top_traffic_accident_offense'
+            , 'reported_date'
+            , 'incident_address_corrected'
+            , 'at_freeway'
+            , 'geo_lon'
+            , 'geo_lat'
+            , 'neighborhood_id'
+            , 'bicycle_ind'
+            , 'pedestrian_ind'
+            , 'updated_at'
+            , 'sbi'
+            , 'fatality'
+            , 'sbi_or_fatality'
+            , 'crash_date'
+            , 'crash_date_str'
+            , 'crash_time_str'
+            , 'crash_year'
+            , 'crash_day_of_year'
+        ]
+
+
 
     def connect_to_postgres(self):
 
@@ -138,6 +161,8 @@ class CrashDataAnalysis():
                 , nonexistent='shift_forward'
                 )
 
+        df = self.incident_address_cleanup(df)
+
         df['crash_date'] = df[date_field_name].dt.strftime('%Y-%m-%d')
         df['crash_date_str'] = df[date_field_name].dt.strftime('%Y-%m-%d %a')
         # df['crash_month_day'] = df[date_field_name].dt.strftime('%m-%d')
@@ -164,7 +189,50 @@ class CrashDataAnalysis():
             this_year_deadly_crashes = df[df.crash_year == self.denver_timestamp().year].fatality.sum()
             print(f'Deadly crashes this year: {this_year_deadly_crashes}')
 
+        return df[self.crash_table_fields]
+
+
+
+    def incident_address_cleanup(self, df):
+        """
+        Clean up the incident address field, add at_freeway flag
+        """
+
+        incident_mapping = {
+            'N BIGHTON BLVD': 'N BRIGHTON BLVD'
+            , 'I25 HWYNB': 'INTERSTATE 25'
+            , 'I25 HWYSB': 'INTERSTATE 25'
+            , 'I25HWY': 'INTERSTATE 25'
+            , 'I70 HWYWB': 'INTERSTATE 70'
+            , 'I70 HWYEB': 'INTERSTATE 70'
+            , 'I225 HWYNB': 'INTERSTATE 225'
+            , 'I225 HWYSB': 'INTERSTATE 225'
+            , 'W 6TH AVE': 'W 6TH AVENUE FWY'
+            , 'PARK AVEW': 'PARK AVE W'
+            , 'S MONACO ST': 'S MONACO STREET PKWY'
+            , 'N MONACO ST': 'N MONACO STREET PKWY'
+            , 'E MLK BLVD': 'E MARTIN LUTHER KING BLVD'
+            , 'E MARTIN LUTHER KING BLVD': 'E MARTIN LUTHER KING JR BLVD'
+            , 'E GVR BLVD': 'GREEN VALLEY RANCH BLVD'
+        }
+
+        df['incident_address_corrected'] = df.incident_address.replace(incident_mapping, regex=True)
+
+        freeways = [
+            'INTERSTATE 25'
+            , 'INTERSTATE 70'
+            , 'INTERSTATE 225'
+            , 'W 6TH AVENUE FWY'
+            , 'PENA BLVD'
+        ]
+
+        df['at_freeway'] = False
+
+        for f in freeways:
+            df.loc[df.incident_address_corrected.str.contains(f), 'at_freeway'] = True
+
         return df
+
 
 
 
@@ -206,7 +274,7 @@ class CrashDataAnalysis():
         Return dataframe with info about recent deadly crashes
         """
 
-        columns_to_query = ['incident_address', 'neighborhood_id', 'crash_time_str', 'pedestrian_ind', 'bicycle_ind']
+        columns_to_query = ['incident_address_corrected', 'neighborhood_id', 'crash_time_str', 'pedestrian_ind', 'bicycle_ind']
         
         query = f"""
             select
@@ -235,7 +303,7 @@ class CrashDataAnalysis():
 
         recent_f = f.tail(20)
 
-        columns_to_print = ['crash_time_str', 'pedestrian', 'bicycle', 'incident_address', 'neighborhood_id']
+        columns_to_print = ['crash_time_str', 'pedestrian', 'bicycle', 'incident_address_corrected', 'neighborhood_id']
         # print(recent_f[columns_to_print].to_string(index=False))
 
         return f
@@ -311,7 +379,7 @@ class CrashDataAnalysis():
         recent = df[df['distance_miles'] < radius_miles]
 
         if verbose:
-            print(recent[['incident_address', 'distance_miles', 'crash_time_str', 'top_traffic_accident_offense']].to_string(index=False))
+            print(recent[['incident_address_corrected', 'distance_miles', 'crash_time_str', 'top_traffic_accident_offense']].to_string(index=False))
 
         return recent
 
@@ -320,5 +388,88 @@ class CrashDataAnalysis():
     def denver_timestamp(self):
 
         return datetime.now(tz=pytz.timezone('America/Denver'))
+
+
+
+    def street_metrics(self, start_date, end_date):
+        """
+        Return metrics for the most dangerous streets in a time period
+        """
+
+        query = f"""
+        with route_centerline_count as (
+            select
+            sr.gid
+            , sr.lrsroute
+            , sc.fullname
+            , count(distinct sc.masterid) as num_centerlines
+            , row_number() over (partition by sr.gid, sr.lrsroute order by count(distinct sc.masterid) desc) 
+                as fullname_priority
+
+            from street_routes sr
+            inner join street_centerline sc using (lrsroute)
+
+            group by 1,2,3
+        )
+
+        , crashes_routes as (
+            select distinct
+            case when sr.gid = 3901 then 3900 else sr.gid end as gid
+            , c.incident_id
+            , c.sbi
+            , c.fatality
+            , c.sbi_or_fatality
+
+            from street_routes sr
+            inner join crashes c on st_dwithin(sr.geom_denver, c.geom_denver, 25)
+
+            where reported_date at time zone 'America/Denver' > '{start_date.strftime('%Y-%m-%d')}'
+            and reported_date at time zone 'America/Denver' < '{end_date.strftime('%Y-%m-%d')}'
+            and not at_freeway
+        )
+
+        , count_routes as (
+            select
+            cr.gid
+            , sr1.lrsroute
+            , st_length(sr1.geom_denver) / 5280 as length_miles
+            , st_AsGeoJSON(sr1.geom) as street_line
+            , count(cr.incident_id) as num_crashes
+            , sum(cr.sbi::int) as num_sbi
+            , sum(cr.fatality::int) as num_fatality
+            , sum(cr.sbi_or_fatality::int) as num_sbi_or_fatality
+            
+            from crashes_routes cr
+            inner join street_routes sr1 using (gid)
+            
+            group by 1,2,3,4
+        )
+
+        select
+        count_routes.gid
+        , count_routes.lrsroute
+        , rcc.fullname
+        , count_routes.length_miles
+        , count_routes.street_line
+        , count_routes.num_crashes
+        , count_routes.num_sbi
+        , count_routes.num_fatality
+        , count_routes.num_sbi_or_fatality
+
+        from count_routes
+        inner join route_centerline_count rcc on (rcc.gid = count_routes.gid and rcc.fullname_priority = 1)
+        """
+
+        street_crashes = pd.read_sql(query, self.conn)
+        
+        days_in_data = (end_date - start_date).days
+        street_crashes['days_in_data'] = days_in_data
+
+        street_crashes = street_crashes[street_crashes.length_miles > 0.5].copy()
+        street_crashes['days_between_crashes'] = days_in_data / street_crashes['num_crashes']
+        street_crashes['crashes_per_mile_per_week'] = ((street_crashes['num_crashes'] / street_crashes['length_miles']) / (days_in_data/7))
+
+        return street_crashes.sort_values(by='crashes_per_mile_per_week', ascending=False)
+
 
 
