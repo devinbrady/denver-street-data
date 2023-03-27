@@ -4,7 +4,6 @@ import pytz
 import hashlib
 import numpy as np
 import pandas as pd
-import sqlite3 as sq
 import psycopg2 as pg
 import geopy.distance
 import geopandas as gpd
@@ -22,8 +21,6 @@ class CrashDataAnalysis():
         self.pg_username = os.environ['PGUSERNAME']
         self.pg_port = os.environ['PGPORT']
         self.pg_password = os.environ['PGPASSWORD']
-
-        conn_sqlite = sq.connect('data/denver_crashes.sqlite')
         
         postgres_connected = False
         try:
@@ -36,7 +33,7 @@ class CrashDataAnalysis():
         if postgres_connected:
             self.conn = conn_postgres
         else:
-            self.conn = conn_sqlite
+            self.conn = None
 
         self.local_timezone = pytz.timezone('America/Denver')
 
@@ -80,29 +77,6 @@ class CrashDataAnalysis():
         return pd.to_datetime(
             pd.read_sql('select max(reported_date) from crashes', self.conn).iloc[0].values[0]
         ).tz_localize('UTC').tz_convert('America/Denver')
-
-
-
-
-    def crash_dataframe(self, csv_file=None, verbose=False, all_columns=False):
-        """
-        Wrapper for preprocess_crash_data()
-        """
-
-        df = self.read_crash_data(verbose)
-
-        return self.preprocess_crash_data(df, verbose=verbose, all_columns=all_columns)
-
-
-
-    def read_crash_data(self, verbose=False):
-
-        if verbose:
-            print(f'Reading file: data/denver_crashes.sqlite')
-        
-        df = pd.read_sql('select * from crashes_raw', self.conn)
-
-        return df
 
 
 

@@ -7,7 +7,6 @@ import argparse
 import requests
 import subprocess
 import pandas as pd
-import sqlite3 as sq
 from pathlib import Path
 from datetime import datetime
 
@@ -84,8 +83,6 @@ class SnapshotCrashData():
 
         print('Downloading data from denvergov... ', end='')
 
-        conn = sq.connect('data/denver_crashes.sqlite')
-
         try:
             df = pd.read_csv(self.url, low_memory=False)
         except Exception as e:
@@ -96,17 +93,12 @@ class SnapshotCrashData():
 
         df['updated_at'] = datetime.now(pytz.timezone('UTC')).strftime('%Y-%m-%d %H:%M %Z')
 
-        df.to_sql('crashes_raw', conn, if_exists='replace')
         df.to_csv('data/raw_crash_data.csv', index=False)
-
-        print(f'Raw data saved to: denver_crashes.sqlite, table: crashes_raw')
+        print('Raw data saved to: data/raw_crash_data.csv')
 
         df_preprocessed = self.cda.preprocess_crash_data(df=df, verbose=False, all_columns=False)
-        df_preprocessed.to_sql('crashes', conn, if_exists='replace')
 
         df_preprocessed.to_csv('data/preprocessed_crash_data.csv', index=False)
-        print(f'Pre-processed data saved to: denver_crashes.sqlite, table: crashes')
-        conn.close()
 
         number_of_crashes = len(df)
         print(f'Crashes in dataset: {number_of_crashes:,}')
