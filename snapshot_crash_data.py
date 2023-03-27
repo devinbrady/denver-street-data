@@ -37,6 +37,8 @@ class SnapshotCrashData():
         # Day of month, year: '%B %-d, %Y')
         self.time_format_string = '%Y_%m_%d__%H_%M'
 
+        self.cda = CrashDataAnalysis()
+
 
 
     def current_time(self):
@@ -99,8 +101,7 @@ class SnapshotCrashData():
 
         print(f'Raw data saved to: denver_crashes.sqlite, table: crashes_raw')
 
-        cda = CrashDataAnalysis()
-        df_preprocessed = cda.preprocess_crash_data(df=df, verbose=False, all_columns=False)
+        df_preprocessed = self.cda.preprocess_crash_data(df=df, verbose=False, all_columns=False)
         df_preprocessed.to_sql('crashes', conn, if_exists='replace')
 
         df_preprocessed.to_csv('data/preprocessed_crash_data.csv', index=False)
@@ -121,13 +122,8 @@ class SnapshotCrashData():
 
         start = time.perf_counter()
 
-        pg_host = os.environ['PGHOST']
-        pg_database = os.environ['PGDATABASE']
-        pg_username = os.environ['PGUSERNAME']
-        pg_port = os.environ['PGPORT']
-
         with subprocess.Popen(
-            f'psql -h {pg_host} -d {pg_database} -U {pg_username} -p {pg_port} -a -q -f postgres_create_table_crashes.sql'
+            f'psql -h {self.cda.pg_host} -d {self.cda.pg_database} -U {self.cda.pg_username} -p {self.cda.pg_port} -a -q -f postgres_create_table_crashes.sql'
             , shell=True
             , stdout=subprocess.PIPE
             ) as proc:

@@ -17,13 +17,20 @@ class CrashDataAnalysis():
 
     def __init__(self):
         
+        self.pg_host = os.environ['PGHOST']
+        self.pg_database = os.environ['PGDATABASE']
+        self.pg_username = os.environ['PGUSERNAME']
+        self.pg_port = os.environ['PGPORT']
+        self.pg_password = os.environ['PGPASSWORD']
+
         conn_sqlite = sq.connect('data/denver_crashes.sqlite')
         
         postgres_connected = False
         try:
             conn_postgres = self.connect_to_postgres()
             postgres_connected = True
-        except:
+        except Exception as e:
+            print(e)
             print('No postgres connection.')
 
         if postgres_connected:
@@ -57,15 +64,11 @@ class CrashDataAnalysis():
 
 
 
+
+
     def connect_to_postgres(self):
 
-        pg_host = os.environ['PGHOST']
-        pg_database = os.environ['PGDATABASE']
-        pg_username = os.environ['PGUSERNAME']
-        pg_port = os.environ['PGPORT']
-        pg_password = os.environ['PGPASSWORD']
-
-        conn = pg.connect(f"host={pg_host} dbname={pg_database} user={pg_username} password={pg_password}")
+        conn = pg.connect(f"host={self.pg_host} dbname={self.pg_database} user={self.pg_username} password={self.pg_password}")
 
         return conn
 
@@ -402,7 +405,6 @@ class CrashDataAnalysis():
             sr.gid
             , sr.lrsroute
             , sc.fullname
-            , count(distinct sc.masterid) as num_centerlines
             , row_number() over (partition by sr.gid, sr.lrsroute order by count(distinct sc.masterid) desc) 
                 as fullname_priority
 
@@ -414,6 +416,12 @@ class CrashDataAnalysis():
 
         , crashes_routes as (
             select distinct
+
+            -- Speer Blvd has two different centerlines: 3900 for north and 3901 for south. These overlap at a lot of intersections,
+            -- especially in the northern parts, which double-counts crashes, one for each centerline.
+            -- Alias all of the southbound 3901 crashes as northbound 3900 crashes, then dedupe this, for analysis.
+            -- See Speer_Blvd.ipynb for the map.
+
             case when sr.gid = 3901 then 3900 else sr.gid end as gid
             , c.incident_id
             , c.sbi
