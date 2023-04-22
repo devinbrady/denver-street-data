@@ -28,11 +28,11 @@ class SnapshotCrashData():
         self.args = parser.parse_args()
 
         self.files = {}
-        self.files['header_etag'] = Path('data/header_etag_source.txt')
-        self.files['hash_local'] = Path('data/data_hash_local.txt')
-        self.files['hash_postgres'] = Path('data/data_hash_postgres.txt')
-        self.files['crash_data_raw'] = Path('data/crash_data_raw.csv')
-        self.files['crash_data_preprocessed'] = Path('data/crash_data_preprocessed.csv')
+        self.files['header_etag'] = Path('../data/header_etag_source.txt')
+        self.files['hash_local'] = Path('../data/data_hash_local.txt')
+        self.files['hash_postgres'] = Path('../data/data_hash_postgres.txt')
+        self.files['crash_data_raw'] = Path('../data/crash_data_raw.csv')
+        self.files['crash_data_preprocessed'] = Path('../data/crash_data_preprocessed.csv')
 
         for file_key in list(self.files.keys()):
             if not self.files[file_key].exists():
@@ -159,7 +159,7 @@ class SnapshotCrashData():
         start = time.perf_counter()
 
         with subprocess.Popen(
-            f'psql -h {self.cda.pg_host} -d {self.cda.pg_database} -U {self.cda.pg_username} -p {self.cda.pg_port} -a -q -f postgres_create_table_crashes.sql'
+            f'psql -h {self.cda.pg_host} -d {self.cda.pg_database} -U {self.cda.pg_username} -p {self.cda.pg_port} -a -q -f ../sql/postgres_create_table_crashes.sql'
             , shell=True
             , stdout=subprocess.PIPE
             ) as proc:
