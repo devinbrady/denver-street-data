@@ -2,7 +2,7 @@
 data/*.csv
 data/*.db
 data/*.sqlite
-data/remote_header_etag.txt
+data/*.txt
 
 # Ignore the video directories
 video_*/

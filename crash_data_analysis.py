@@ -2,6 +2,7 @@
 import os
 import pytz
 import hashlib
+import geocoder
 import numpy as np
 import pandas as pd
 import psycopg2 as pg
@@ -10,6 +11,8 @@ import geopandas as gpd
 from datetime import datetime
 import matplotlib.pyplot as plt
 from shapely.geometry import Point
+from sqlalchemy import create_engine
+
 
 
 class CrashDataAnalysis():
@@ -61,11 +64,11 @@ class CrashDataAnalysis():
 
 
 
-
-
     def connect_to_postgres(self):
 
-        conn = pg.connect(f"host={self.pg_host} dbname={self.pg_database} user={self.pg_username} password={self.pg_password}")
+        # conn = pg.connect(f"host={self.pg_host} dbname={self.pg_database} user={self.pg_username} password={self.pg_password}")
+
+        conn = engine = create_engine(f'postgresql+psycopg2://{self.pg_username}:{self.pg_password}@{self.pg_host}:{self.pg_port}/{self.pg_database}')
 
         return conn
 
@@ -127,7 +130,7 @@ class CrashDataAnalysis():
         date_fields = [c for c in df.columns if '_date' in c.lower()] + ['updated_at']
 
         for d in date_fields:
-            df[d] = pd.to_datetime(df[d])
+            df[d] = pd.to_datetime(df[d], format='mixed')
 
         date_field_name = 'reported_date'
         # todo: sqlite/pandas seems to read this tz-ambiguous field in the local timezone
@@ -341,24 +344,34 @@ class CrashDataAnalysis():
 
 
 
-    def crashes_near_point(self, df, lat, lon, radius_miles=1, verbose=False):
+    def days_between_crashes_near_point(self, lat, lon, radius_miles=0.25):
         """
-        Return a subset of the crash dataframe where the crashes occured near a point
+        Return a count of days between crashes that have occurred near a point
         """
 
-        df = df.copy()
+        query = f"""
+            select
+            count(*) as num_crashes
 
-        df['target_lat'] = lat
-        df['target_lon'] = lon
+            from crashes
 
-        df['distance_miles'] = self.pythagorean_distance(df['geo_lat'], df['geo_lon'], df['target_lat'], df['target_lon'])
+            where geo_lon is not null
+            and ST_Distance(
+                geom_denver, ST_Transform(ST_SetSRID(ST_MakePoint({lon},{lat}), 4326), 3502)
+                ) < {radius_miles * 5280}
 
-        recent = df[df['distance_miles'] < radius_miles]
+        """
 
-        if verbose:
-            print(recent[['incident_address_corrected', 'distance_miles', 'crash_time_str', 'top_traffic_accident_offense']].to_string(index=False))
+        result = pd.read_sql(query, self.conn)
+        num_crashes = result['num_crashes'].values[0]
+        if num_crashes == 0:
+            return None
 
-        return recent
+        days_query = "select date_part('day', max(reported_date) - min(reported_date)) as days_in_data from crashes"
+        days_result = pd.read_sql(days_query, self.conn)
+        days_in_data = days_result['days_in_data'].values[0]
+
+        return days_in_data / num_crashes
 
 
 
@@ -396,7 +409,12 @@ class CrashDataAnalysis():
             -- Alias all of the southbound 3901 crashes as northbound 3900 crashes, then dedupe this, for analysis.
             -- See Speer_Blvd.ipynb for the map.
 
-            case when sr.gid = 3901 then 3900 else sr.gid end as gid
+            case
+                when sr.gid = 3901 then 3900
+                when sr.gid = 1453 then 1452
+                else sr.gid end
+                as gid
+
             , c.incident_id
             , c.sbi
             , c.fatality
@@ -452,6 +470,19 @@ class CrashDataAnalysis():
         street_crashes['crashes_per_mile_per_week'] = ((street_crashes['num_crashes'] / street_crashes['length_miles']) / (days_in_data/7))
 
         return street_crashes.sort_values(by='crashes_per_mile_per_week', ascending=False)
+
+
+
+    def geocode_location(self, location_str):
+
+        gc = geocoder.google(location_str)
+
+        if not gc.ok:
+            raise Exception(f'Google Geocoder failed, message: {gc.status}')
+
+        return gc.latlng
+
+
 
 
 
