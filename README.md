@@ -18,3 +18,16 @@ It shows that deadly crashes stopped at the onset of the pandemic in 2020 (green
 ## Data Source
 
 The data comes from the "Traffic Accidents" dataset maintained by the City of Denver: [https://denvergov.org/opendata/dataset/city-and-county-of-denver-traffic-accidents](https://denvergov.org/opendata/dataset/city-and-county-of-denver-traffic-accidents)
+
+## Data Quirks
+
+To be included in this dataset, the crash must have:
+
+* Occurred in the city of Denver since Jan 1, 2013
+* Involved at least one vehicle eligible for a license plate
+    * An example of a crash not included is one where an RTD train hits a pedestrian, or a person on a bike hits another person on a bike
+
+## SQL Query Examples
+
+See the file [sql/query_examples.sql](sql/query_examples.sql) for some example queries. 
+

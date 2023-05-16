@@ -410,8 +410,10 @@ class CrashDataAnalysis():
             -- See Speer_Blvd.ipynb for the map.
 
             case
-                when sr.gid = 3901 then 3900
-                when sr.gid = 1453 then 1452
+                when sr.gid = 3901 then 3900 -- Speer north
+                when sr.gid = 1453 then 1452 -- Speer south
+                when sr.gid = 6167 then 6166 -- Marion Parkway
+
                 else sr.gid end
                 as gid
 
