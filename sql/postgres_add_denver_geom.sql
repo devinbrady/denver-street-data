@@ -7,3 +7,7 @@ CREATE INDEX street_routes_geom_denver_gist ON street_routes USING gist(geom_den
 ALTER TABLE street_centerline ADD COLUMN geom_denver GEOMETRY;
 UPDATE street_centerline SET geom_denver = ST_Transform(geom,3502);
 CREATE INDEX street_centerline_geom_denver_gist ON street_centerline USING gist(geom_denver);
+
+ALTER TABLE statistical_neighborhoods ADD COLUMN geom_denver GEOMETRY;
+UPDATE statistical_neighborhoods SET geom_denver = ST_Transform(geom,3502);
+CREATE INDEX statistical_neighborhoods_geom_denver_gist ON statistical_neighborhoods USING gist(geom_denver);

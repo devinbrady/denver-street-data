@@ -1,5 +1,6 @@
 
 import os
+import sys
 import pytz
 import hashlib
 import geocoder
@@ -51,6 +52,7 @@ class CrashDataAnalysis():
             , 'neighborhood_id'
             , 'bicycle_ind'
             , 'pedestrian_ind'
+            , 'day_or_night'
             , 'updated_at'
             , 'sbi'
             , 'fatality'
@@ -98,6 +100,7 @@ class CrashDataAnalysis():
             , 'neighborhood_id'
             , 'bicycle_ind'
             , 'pedestrian_ind'
+            , 'LIGHT_CONDITION'
             # , 'SERIOUSLY_INJURED'
             # , 'FATALITIES'
             , 'updated_at'
@@ -142,6 +145,19 @@ class CrashDataAnalysis():
                 )
 
         df = self.incident_address_cleanup(df)
+
+        df['day_or_night'] = df.LIGHT_CONDITION.map({
+            '  ': 'Unknown'
+            , 'DARK-LIGHTED': 'Night'
+            , 'DARK-UNLIGHTED': 'Night'
+            , 'DAWN OR DUSK': 'Night'
+            , 'DAY LIGHT': 'Day'
+            , 'Dark-Lighted': 'Night'
+            , 'Dark-Unlighted': 'Night'
+            , 'Dawn or Dusk': 'Night'
+            , 'Daylight': 'Day'
+            , 'UNDER INVESTIGATION': 'Unknown'
+        })
 
         df['crash_date'] = df[date_field_name].dt.strftime('%Y-%m-%d')
         df['crash_date_str'] = df[date_field_name].dt.strftime('%Y-%m-%d %a')

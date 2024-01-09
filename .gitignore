@@ -5,7 +5,8 @@ data/*.sqlite
 data/*.txt
 
 # Ignore the video directories
-video_*/
+videos/
+*.mp4
 
 # Ignore everything in the shapefiles directory
 shapefiles/
