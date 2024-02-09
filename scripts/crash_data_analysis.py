@@ -9,6 +9,7 @@ import pandas as pd
 import psycopg2 as pg
 import geopy.distance
 import geopandas as gpd
+from pathlib import Path
 from datetime import datetime
 import matplotlib.pyplot as plt
 from shapely.geometry import Point
@@ -53,6 +54,7 @@ class CrashDataAnalysis():
             , 'bicycle_ind'
             , 'pedestrian_ind'
             , 'day_or_night'
+            , 'driver_action'
             , 'updated_at'
             , 'sbi'
             , 'fatality'
@@ -64,7 +66,10 @@ class CrashDataAnalysis():
             , 'crash_day_of_year'
         ]
 
+        self.files = {}
+        self.files['crash_data_raw'] = Path('data/crash_data_raw.csv')
 
+        
 
     def connect_to_postgres(self):
 
@@ -85,6 +90,19 @@ class CrashDataAnalysis():
 
 
 
+    def crash_dataframe(self):
+        """
+        Return DataFrame with all crashes and all fields
+        """
+
+        df = pd.read_csv(self.files['crash_data_raw'], low_memory=False)
+
+        df_preprocessed = self.preprocess_crash_data(df=df, verbose=False, all_columns=True)
+
+        return df_preprocessed
+
+
+
     def preprocess_crash_data(self, df, verbose=False, all_columns=False):
         """
         Read in the most recent CSV file of crash data and return a cleaned DataFrame
@@ -101,6 +119,8 @@ class CrashDataAnalysis():
             , 'bicycle_ind'
             , 'pedestrian_ind'
             , 'LIGHT_CONDITION'
+            , 'TU1_DRIVER_ACTION'
+            , 'TU2_DRIVER_ACTION'
             # , 'SERIOUSLY_INJURED'
             # , 'FATALITIES'
             , 'updated_at'
@@ -159,6 +179,11 @@ class CrashDataAnalysis():
             , 'UNDER INVESTIGATION': 'Unknown'
         })
 
+        df['driver_action'] = (
+            'TU1: ' + df['TU1_DRIVER_ACTION'].str.lower().str.strip()
+            + ', TU2: ' + df['TU2_DRIVER_ACTION'].str.lower().str.strip()
+            )
+
         df['crash_date'] = df[date_field_name].dt.strftime('%Y-%m-%d')
         df['crash_date_str'] = df[date_field_name].dt.strftime('%Y-%m-%d %a')
         # df['crash_month_day'] = df[date_field_name].dt.strftime('%m-%d')
@@ -185,7 +210,12 @@ class CrashDataAnalysis():
             this_year_deadly_crashes = df[df.crash_year == self.denver_timestamp().year].fatality.sum()
             print(f'Deadly crashes this year: {this_year_deadly_crashes}')
 
-        return df[self.crash_table_fields]
+        if all_columns:
+            return_columns = df.columns
+        else:
+            return_columns = self.crash_table_fields
+        
+        return df[return_columns]
 
 
 
@@ -498,8 +528,10 @@ class CrashDataAnalysis():
         if not gc.ok:
             raise Exception(f'Google Geocoder failed, message: {gc.status}')
 
-        return gc.latlng
+        if gc.json['confidence'] < 9:
+            raise Exception(f"Geocoder confidence is too low for location: \"{location_str}\", confidence {gc.json['confidence']}")
 
+        return gc.latlng
 
 
 

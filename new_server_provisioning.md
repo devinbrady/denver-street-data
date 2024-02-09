@@ -37,3 +37,17 @@
         shp2pgsql -s 4326 -I shapefiles/street_centerline/street_centerline.shp | psql -h "$PGHOST" -d "$PGDATABASE" -U "$PGUSERNAME" -p "$PGPORT"
         shp2pgsql -s 4326 -I shapefiles/intersections/intersections.shp | psql -h "$PGHOST" -d "$PGDATABASE" -U "$PGUSERNAME" -p "$PGPORT"
         shp2pgsql -s 4326 -I shapefiles/statistical_neighborhoods/statistical_neighborhoods.shp | psql -h "$PGHOST" -d "$PGDATABASE" -U "$PGUSERNAME" -p "$PGPORT"
+        
+## Adding a Column
+
+```
+scripts/crash_data_analysis
+    __init__
+        1) add the new column name to crash_table_fields
+    preprocess_crash_data
+        2) add the raw column name to columns_to_read
+        3) create the new column name in df, do any cleanup necessary here
+sql/postgres_create_table_crashes.sql
+    4) add new field to CREATE TABLE statement
+    5) add new field to \copy command
+```
