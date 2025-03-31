@@ -4,7 +4,7 @@ CREATE TABLE "crashes" (
     "incident_id" BIGINT NOT NULL
     , "top_traffic_accident_offense" CHARACTER VARYING(100)
     , "reported_date" TIMESTAMP WITH TIME ZONE
-    , "incident_address_corrected" CHARACTER VARYING(100)
+    , "incident_address_corrected" CHARACTER VARYING(200)
     , "at_freeway" BOOL
     , "geo_lon" DOUBLE PRECISION
     , "geo_lat" DOUBLE PRECISION

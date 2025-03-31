@@ -75,7 +75,7 @@ class CrashDataAnalysis():
 
         # conn = pg.connect(f"host={self.pg_host} dbname={self.pg_database} user={self.pg_username} password={self.pg_password}")
 
-        conn = engine = create_engine(f'postgresql+psycopg2://{self.pg_username}:{self.pg_password}@{self.pg_host}:{self.pg_port}/{self.pg_database}')
+        conn = create_engine(f'postgresql+psycopg2://{self.pg_username}:{self.pg_password}@{self.pg_host}:{self.pg_port}/{self.pg_database}')
 
         return conn
 
@@ -158,11 +158,13 @@ class CrashDataAnalysis():
         date_field_name = 'reported_date'
         # todo: sqlite/pandas seems to read this tz-ambiguous field in the local timezone
         # when I switch this to postgres, might have to be more explicit about timezones
-        df[date_field_name] = df[date_field_name].dt.tz_localize(
-                self.local_timezone
-                , ambiguous=True
-                , nonexistent='shift_forward'
-                )
+        if df[date_field_name].dt.tz is None:
+            print(f'Converting field "{date_field_name}" to Denver time.')
+            df[date_field_name] = df[date_field_name].dt.tz_localize(
+                    self.local_timezone
+                    , ambiguous=True
+                    , nonexistent='shift_forward'
+                    )
 
         df = self.incident_address_cleanup(df)
 
@@ -438,6 +440,7 @@ class CrashDataAnalysis():
             sr.gid
             , sr.lrsroute
             , sc.fullname
+            , case when left(sc.fullname, 2) in ('N ', 'S ', 'E ', 'W ') then right(sc.fullname, length(sc.fullname)-2) else sc.fullname end as street_name_no_cardinal
             , row_number() over (partition by sr.gid, sr.lrsroute order by count(distinct sc.masterid) desc) 
                 as fullname_priority
 
@@ -467,6 +470,8 @@ class CrashDataAnalysis():
             , c.sbi
             , c.fatality
             , c.sbi_or_fatality
+            , c.bicycle_ind
+            , c.pedestrian_ind
 
             from street_routes sr
             inner join crashes c on st_dwithin(sr.geom_denver, c.geom_denver, 25)
@@ -486,6 +491,8 @@ class CrashDataAnalysis():
             , sum(cr.sbi::int) as num_sbi
             , sum(cr.fatality::int) as num_fatality
             , sum(cr.sbi_or_fatality::int) as num_sbi_or_fatality
+            , sum(cr.bicycle_ind) as sum_bicycle_ind
+            , sum(cr.pedestrian_ind) as sum_pedestrian_ind
             
             from crashes_routes cr
             inner join street_routes sr1 using (gid)
@@ -497,12 +504,15 @@ class CrashDataAnalysis():
         count_routes.gid
         , count_routes.lrsroute
         , rcc.fullname
+        , rcc.street_name_no_cardinal
         , count_routes.length_miles
         , count_routes.street_line
         , count_routes.num_crashes
         , count_routes.num_sbi
         , count_routes.num_fatality
         , count_routes.num_sbi_or_fatality
+        , count_routes.sum_bicycle_ind
+        , count_routes.sum_pedestrian_ind
 
         from count_routes
         inner join route_centerline_count rcc on (rcc.gid = count_routes.gid and rcc.fullname_priority = 1)
@@ -516,6 +526,7 @@ class CrashDataAnalysis():
         street_crashes = street_crashes[street_crashes.length_miles > 0.5].copy()
         street_crashes['days_between_crashes'] = days_in_data / street_crashes['num_crashes']
         street_crashes['crashes_per_mile_per_week'] = ((street_crashes['num_crashes'] / street_crashes['length_miles']) / (days_in_data/7))
+        street_crashes['pedestrian_ind_per_mile_per_year'] = ((street_crashes['sum_pedestrian_ind'] / street_crashes['length_miles']) / (days_in_data/365.25))
 
         return street_crashes.sort_values(by='crashes_per_mile_per_week', ascending=False)
 

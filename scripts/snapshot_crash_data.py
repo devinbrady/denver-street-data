@@ -22,6 +22,10 @@ class SnapshotCrashData():
 
     def __init__(self):
 
+        # Hard code an input CSV
+        self.input_file = Path('../data/crash_data_raw_20250331.csv')
+        # self.input_file = None
+
         parser = argparse.ArgumentParser()
         parser.add_argument('-f', '--download-force', action='store_true', help='Download a copy even if the remote header has not changed')
         parser.add_argument('-p', '--postgres-force', action='store_true', help='Preprocess the local raw file and upload to postgres')
@@ -73,7 +77,13 @@ class SnapshotCrashData():
             print('Something went wrong accessing the remote file, so we will not try to download it.')
             return False
         
-        self.remote_header_etag = r.headers['ETag']
+        # for k in r.headers:
+        #     print(k)
+        #     print(r.headers[k])
+        #     print()
+
+        # self.remote_header_etag = r.headers['ETag']
+        self.remote_header_etag = str(random.random()) # force the download to happen every time
 
         if self.remote_header_etag == old_header_etag:
             print('Source data matches local data.')
@@ -122,15 +132,24 @@ class SnapshotCrashData():
 
     def download_file(self):
 
-        print('Downloading data from denvergov... ', end='')
 
-        try:
-            df = pd.read_csv(self.url, low_memory=False)
-        except Exception as e:
-            print('Something went wrong trying to download the CSV. Quitting.')
-            return
+        if self.input_file:
+            print(f'Reading: {self.input_file}')
+            df = pd.read_csv(self.input_file, low_memory=False)
+        
+        else:
 
-        print('complete.')
+            # Download
+            print('Downloading data from denvergov... ', end='')
+
+            try:
+                df = pd.read_csv(self.url, low_memory=False)
+            except Exception as e:
+                print('Something went wrong trying to download the CSV. Quitting.')
+                return
+
+            print('complete.')
+
 
         df['updated_at'] = datetime.now(pytz.timezone('UTC')).isoformat()
 
@@ -144,6 +163,7 @@ class SnapshotCrashData():
 
         number_of_crashes = len(df)
         print(f'Crashes in dataset: {number_of_crashes:,}')
+        print(f'Oldest crash: {df_preprocessed.reported_date.min()}')
         print(f'Most recent crash: {df_preprocessed.reported_date.max()}')
 
         self.write_new_etag_to_file()
