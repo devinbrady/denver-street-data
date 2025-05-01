@@ -3,6 +3,7 @@ data/*.csv
 data/*.db
 data/*.sqlite
 data/*.txt
+data/*.geojson
 data/postgis/*
 
 # Ignore the video directories

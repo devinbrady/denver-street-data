@@ -23,7 +23,7 @@ class SnapshotCrashData():
     def __init__(self):
 
         # Hard code an input CSV
-        self.input_file = Path('../data/crash_data_raw_20250331.csv')
+        self.input_file = Path('../data/crash_data_raw_20250423.csv')
         # self.input_file = None
 
         parser = argparse.ArgumentParser()
@@ -43,7 +43,8 @@ class SnapshotCrashData():
                 with open(self.files[file_key], 'w') as f:
                     f.write(''.join(random.choices(string.ascii_lowercase, k=13)))
 
-        self.url = 'https://www.denvergov.org/media/gis/DataCatalog/traffic_accidents/csv/traffic_accidents.csv'
+        # self.url = 'https://www.denvergov.org/media/gis/DataCatalog/traffic_accidents/csv/traffic_accidents.csv'
+        self.url = 'https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/ODC_CRIME_TRAFFICACCIDENTS5YR_P/FeatureServer/325/query?outFields=*&where=1%3D1&f=geojson'
 
         self.tz = pytz.timezone('America/Denver')
 
@@ -77,6 +78,7 @@ class SnapshotCrashData():
             print('Something went wrong accessing the remote file, so we will not try to download it.')
             return False
         
+        # print('headers:')
         # for k in r.headers:
         #     print(k)
         #     print(r.headers[k])
@@ -143,9 +145,9 @@ class SnapshotCrashData():
             print('Downloading data from denvergov... ', end='')
 
             try:
-                df = pd.read_csv(self.url, low_memory=False)
+                df = gpd.read_file(self.url, low_memory=False)
             except Exception as e:
-                print('Something went wrong trying to download the CSV. Quitting.')
+                print('Something went wrong trying to download the source data. Quitting.')
                 return
 
             print('complete.')
