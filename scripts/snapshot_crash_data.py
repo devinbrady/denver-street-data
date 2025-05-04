@@ -23,7 +23,7 @@ class SnapshotCrashData():
     def __init__(self):
 
         # Hard code an input CSV
-        self.input_file = Path('../data/crash_data_raw_20250423.csv')
+        self.input_file = Path('../data/crash_data_raw_20250502.csv')
         # self.input_file = None
 
         parser = argparse.ArgumentParser()

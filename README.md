@@ -25,6 +25,8 @@ To be included in this dataset, the crash must have:
 * Involved at least one vehicle eligible for a license plate
     * Examples of a crashes not included is one where an RTD train hits a pedestrian, or a crash where a person on a bike hits another person on a bike
 
+For definitions of the fields in the raw data, see the [Data Readme](data/README.md).
+
 ## SQL Query Examples
 
 See the file [sql/query_examples.sql](sql/query_examples.sql) for some example queries. 
