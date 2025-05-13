@@ -5,7 +5,6 @@ data/*.sqlite
 data/*.txt
 data/*.geojson
 data/postgis/*
-data/traffic_counts/*.xls
 
 # Ignore the video directories
 videos/
