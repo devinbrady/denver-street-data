@@ -23,7 +23,8 @@ class SnapshotCrashData():
     def __init__(self):
 
         # Hard code an input CSV
-        self.input_file = Path('../data/crash_data_raw_20250502.csv')
+        self.input_file = self.most_recent_file(directory_path=Path('../data'), filename_pattern='crash_data_raw_')
+        # self.input_file = Path('../data/crash_data_raw_20250506.csv')
         # self.input_file = None
 
         parser = argparse.ArgumentParser()
@@ -53,6 +54,33 @@ class SnapshotCrashData():
         self.time_format_string = '%Y_%m_%d__%H_%M'
 
         self.cda = CrashDataAnalysis()
+
+
+
+    def most_recent_file(self, directory_path, filename_pattern):
+        """
+        Returns the most recent file in a directory. 
+        The filenames must have a timestamp in them. It's the max of the sorted text.
+
+        directory_path: the directory to search in. pathlib Path object
+        filename_pattern: the text in the filename to narrow the results by
+        """
+
+        list_of_files = sorted(
+            [f for f in os.listdir(directory_path) if (
+                filename_pattern in f
+                and '~' not in f
+                )
+            ]
+            )
+
+        if len(list_of_files) == 0:
+            print(f'No files match the pattern "{filename_pattern}" in directory "{directory_path}".')
+            mrf = None
+        else:
+            mrf = directory_path / list_of_files[-1]
+
+        return mrf
 
 
 
