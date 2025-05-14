@@ -297,12 +297,16 @@ class CrashDataAnalysis():
 
 
 
-    def recent_deadly_crashes(self):
+    def recent_deadly_crashes(self, additional_columns=None):
         """
         Return dataframe with info about recent deadly crashes
         """
 
         columns_to_query = ['incident_address_corrected', 'neighborhood_id', 'crash_time_str', 'pedestrian_ind', 'bicycle_ind']
+
+        if additional_columns:
+            columns_to_query += additional_columns
+
         
         query = f"""
             select
