@@ -14,7 +14,7 @@ import pandas as pd
 from pathlib import Path
 from datetime import datetime
 
-from crash_data_analysis import CrashDataAnalysis
+from scripts.crash_data_analysis import CrashDataAnalysis
 
 
 
@@ -23,20 +23,22 @@ class SnapshotCrashData():
     def __init__(self):
 
         # Hard code an input CSV
-        self.input_file = Path('../data/crash_data_raw_20250502.csv')
+        data_dir = Path('data')
+        self.input_file = self.most_recent_file(directory_path=data_dir, filename_pattern='crash_data_raw_')
         # self.input_file = None
 
         parser = argparse.ArgumentParser()
         parser.add_argument('-f', '--download-force', action='store_true', help='Download a copy even if the remote header has not changed')
         parser.add_argument('-p', '--postgres-force', action='store_true', help='Preprocess the local raw file and upload to postgres')
         self.args = parser.parse_args()
+        print(self.args)
 
         self.files = {}
-        self.files['header_etag'] = Path('../data/header_etag_source.txt')
-        self.files['hash_local'] = Path('../data/data_hash_local.txt')
-        self.files['hash_postgres'] = Path('../data/data_hash_postgres.txt')
-        self.files['crash_data_raw'] = Path('../data/crash_data_raw.csv')
-        self.files['crash_data_preprocessed'] = Path('../data/crash_data_preprocessed.csv')
+        self.files['header_etag'] = data_dir / Path('header_etag_source.txt')
+        self.files['hash_local'] = data_dir / Path('data_hash_local.txt')
+        self.files['hash_postgres'] = data_dir / Path('data_hash_postgres.txt')
+        self.files['crash_data_raw'] = data_dir / Path('crash_data_raw.csv')
+        self.files['crash_data_preprocessed'] = data_dir / Path('crash_data_preprocessed.csv')
 
         for file_key in list(self.files.keys()):
             if not self.files[file_key].exists():
@@ -53,6 +55,33 @@ class SnapshotCrashData():
         self.time_format_string = '%Y_%m_%d__%H_%M'
 
         self.cda = CrashDataAnalysis()
+
+
+
+    def most_recent_file(self, directory_path, filename_pattern):
+        """
+        Returns the most recent file in a directory. 
+        The filenames must have a timestamp in them. It's the max of the sorted text.
+
+        directory_path: the directory to search in. pathlib Path object
+        filename_pattern: the text in the filename to narrow the results by
+        """
+
+        list_of_files = sorted(
+            [f for f in os.listdir(directory_path) if (
+                filename_pattern in f
+                and '~' not in f
+                )
+            ]
+            )
+
+        if len(list_of_files) == 0:
+            print(f'No files match the pattern "{filename_pattern}" in directory "{directory_path}".')
+            mrf = None
+        else:
+            mrf = directory_path / list_of_files[-1]
+
+        return mrf
 
 
 
@@ -181,7 +210,7 @@ class SnapshotCrashData():
         start = time.perf_counter()
 
         with subprocess.Popen(
-            f'psql -h {self.cda.pg_host} -d {self.cda.pg_database} -U {self.cda.pg_username} -p {self.cda.pg_port} -a -q -f ../sql/postgres_create_table_crashes.sql'
+            f'psql -h {self.cda.pg_host} -d {self.cda.pg_database} -U {self.cda.pg_username} -p {self.cda.pg_port} -a -q -f sql/postgres_create_table_crashes.sql'
             , shell=True
             , stdout=subprocess.PIPE
             ) as proc:
