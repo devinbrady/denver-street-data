@@ -156,8 +156,12 @@ class CrashDataAnalysis():
             df[d] = pd.to_datetime(df[d], format='mixed')
 
         date_field_name = 'reported_date'
+
+        # In the raw data, reported_date is in local Denver time. Convert to UTC and store in the database as UTC.
+
         # todo: sqlite/pandas seems to read this tz-ambiguous field in the local timezone
         # when I switch this to postgres, might have to be more explicit about timezones
+        
         if df[date_field_name].dt.tz is None:
             print(f'Converting field "{date_field_name}" to Denver time.')
             df[date_field_name] = df[date_field_name].dt.tz_localize(

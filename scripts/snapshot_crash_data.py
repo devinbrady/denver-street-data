@@ -31,7 +31,6 @@ class SnapshotCrashData():
         parser.add_argument('-f', '--download-force', action='store_true', help='Download a copy even if the remote header has not changed')
         parser.add_argument('-p', '--postgres-force', action='store_true', help='Preprocess the local raw file and upload to postgres')
         self.args = parser.parse_args()
-        print(self.args)
 
         self.files = {}
         self.files['header_etag'] = data_dir / Path('header_etag_source.txt')
@@ -65,6 +64,8 @@ class SnapshotCrashData():
 
         directory_path: the directory to search in. pathlib Path object
         filename_pattern: the text in the filename to narrow the results by
+
+        todo: this function is duplicated in crash_data_analysis
         """
 
         list_of_files = sorted(
@@ -194,8 +195,8 @@ class SnapshotCrashData():
 
         number_of_crashes = len(df)
         print(f'Crashes in dataset: {number_of_crashes:,}')
-        print(f'Oldest crash: {df_preprocessed.reported_date.min()}')
-        print(f'Most recent crash: {df_preprocessed.reported_date.max()}')
+        print(f'First crash: {df_preprocessed.reported_date.min()}')
+        print(f' Last crash: {df_preprocessed.reported_date.max()}')
 
         self.write_new_etag_to_file()
         self.save_new_data_hash(df_preprocessed[[c for c in df_preprocessed.columns if c != 'updated_at']], self.files['hash_local'])
@@ -221,7 +222,7 @@ class SnapshotCrashData():
 
         end = time.perf_counter()
         seconds = (end-start)
-        print(f'Copy to Postgres complete. Elapsed time: {seconds:0.1f} seconds')
+        print(f'Copy to Postgres complete. Elapsed time: {seconds:0.1f} seconds\n')
 
 
 
@@ -229,6 +230,7 @@ class SnapshotCrashData():
 
         # current_timestamp = datetime.now(self.tz).strftime('%Y-%m-%d %H:%M:%S %Z')
         # print(f'{current_timestamp} -> ', end='')
+        print()
 
         if (self.remote_file_has_new_header()) or (self.args.download_force):
             self.download_file()
