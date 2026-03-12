@@ -197,6 +197,7 @@ class SnapshotCrashData():
         print(f'Crashes in dataset: {number_of_crashes:,}')
         print(f'First crash: {df_preprocessed.reported_date.min()}')
         print(f' Last crash: {df_preprocessed.reported_date.max()}')
+        print(f" Last crash: {df_preprocessed.reported_date.max().strftime('%a %b %-d, %-I:%M %p')}")
 
         self.write_new_etag_to_file()
         self.save_new_data_hash(df_preprocessed[[c for c in df_preprocessed.columns if c != 'updated_at']], self.files['hash_local'])

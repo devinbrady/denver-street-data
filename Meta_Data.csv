@@ -1,0 +1,46 @@
+﻿Variable,Description
+OBJECTID_1,Record identification number used in this dataset
+INCIDENT_ID,Official record identification number assigned by the Denver Police Department
+OFFENSE_ID,"Concatenation of INCIDENT_ID, OFFENSE_CODE, and OFFENSE_CODE_EXTENSION"
+OFFENSE_CODE,Code indicating the type of offense
+OFFENSE_CODE_EXTENSION,"Code indicating the offense subtype, if applicable"
+TOP_TRAFFIC_ACCIDENT_OFFENSE,"The most significant motor vehicle accident offense associated with the crash (in order, most to least): FATAL, SBI, HIT & RUN, DUI, POLICE, ACCIDENT"
+FIRST_OCCURRENCE_DATE,"Earliest potential date and time of reported crash (In some cases, like a hit and run crash involving a parked vehicle, the reporting vehicle owner may not know the exact time of occurrence.)"
+LAST_OCCURRENCE_DATE,"Latest potential date and time of reported crash (In some cases, like a hit and run crash involving a parked vehicle, the reporting vehicle owner may not know the exact time of occurrence.)"
+REPORTED_DATE,Date and time the crash was reported to DPD
+INCIDENT_ADDRESS,Approximate location of the incident
+GEO_X,Approximate horizontal location (east-west) of crash defined in the NAD 1983 State Plane feet Colorado Central FIPS 0502 projected coordinate system
+GEO_Y,Approximate vertical location (north-south) of crash defined in the NAD 1983 State Plane feet Colorado Central FIPS 0502 projected coordinate system
+GEO_LON,Approximate horizontal location (east-west) of crash defined in WGS 1984 geographic coordinate system
+GEO_LAT,Approximate vertical location (north-south) of crash defined in WGS 1984 geographic coordinate system
+DISTRICT_ID,Denver Police District where the crash occurred
+PRECINCT_ID,Denver Police Precinct where the crash occurred
+NEIGHBORHOOD_ID,Neighborhood where the crash occurred
+BICYCLE_IND,Indicates how many people riding bicycles were involved with the crash
+PEDESTRIAN_IND,Indicates how many pedestrians were involved with the crash
+HARMFUL_EVENT_SEQ_1,Indicates the first occurring harmful event in the crash
+HARMFUL_EVENT_SEQ_2,Indicates the second occurring harmful event in the crash
+HARMFUL_EVENT_SEQ_3,Indicates the most harmful event in the crash
+ROAD_LOCATION,Describes the specific location of the crash in relation to the roadway or if on private property
+ROAD_DESCRIPTION,"Describes the specific location of the crash in relation to intersections, alleys, driveways, highway interchanges, and parking lots"
+ROAD_CONTOUR,Describes the specific location of the crash relating to horizonal and vertical curves at the location of the first harmful event
+ROAD_CONDITION,Describes the roadway conditions at the time and location of the crash
+LIGHT_CONDITION,Describes the roadway lighting conditions at the time and location of the crash
+TU1_VEHICLE_TYPE,Indicates the vehicle type of traffic unit 1
+TU1_TRAVEL_DIRECTION,Indicates the vehicle direction prior to impact of traffic unit 1
+TU1_VEHICLE_MOVEMENT,Indicates the vehicle movement prior to impact of traffic unit 1
+TU1_DRIVER_ACTION,"Indicates any action contibuting to the crash by the driver of traffic unit 1, when applicable"
+TU1_DRIVER_HUMANCONTRIBFACTOR,"Indicates any additional contributing factor to the crash by the driver of traffic unit 1, when applicable"
+TU1_PEDESTRIAN_ACTION,"Indicates any action contibuting to the crash by a pedestrian traffic unit 1, when applicable"
+TU2_VEHICLE_TYPE,Indicates the vehicle type of traffic unit 2
+TU2_TRAVEL_DIRECTION,Indicates the vehicle direction prior to impact of traffic unit 2
+TU2_VEHICLE_MOVEMENT,Indicates the vehicle movement prior to impact of traffic unit 2
+TU2_DRIVER_ACTION,"Indicates any action contibuting to the crash by the driver of traffic unit 2, when applicable"
+TU2_DRIVER_HUMANCONTRIBFACTOR,"Indicates any additional contributing factor to the crash by the driver of traffic unit 2, when applicable"
+TU2_PEDESTRIAN_ACTION,"Indicates any action contibuting to the crash by a pedestrian traffic unit 2, when applicable"
+SERIOUSLY_INJURED,Indicates the number of people who were seriously injured as a result of the crash
+FATALITIES,Indicates the number of people who were fatally injured as a result of the crash
+FATALITY_MODE_1,"Indicates the mode (means of travel) of a person fatally injured as a result of the crash, not related to traffic unit number"
+FATALITY_MODE_2,"Indicates the mode (means of travel) of a second person fatally injured as a result of the crash, not related to traffic unit number"
+SERIOUSLY_INJURED_MODE_1,"Indicates the mode (means of travel) of a person seriously injured as a result of the crash, not related to traffic unit number"
+SERIOUSLY_INJURED_MODE_2,"Indicates the mode (means of travel) of a second person seriously injured as a result of the crash, not related to traffic unit number"

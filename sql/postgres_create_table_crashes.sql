@@ -1,7 +1,8 @@
 DROP TABLE IF EXISTS crashes;
 
 CREATE TABLE "crashes" (
-    "incident_id" BIGINT NOT NULL
+  "row_id" BIGINT NOT NULL
+    , "incident_id" CHARACTER VARYING(20) NOT NULL
     , "top_traffic_accident_offense" CHARACTER VARYING(100)
     , "reported_date" TIMESTAMP WITH TIME ZONE
     , "incident_address_corrected" CHARACTER VARYING(200)
@@ -24,7 +25,7 @@ CREATE TABLE "crashes" (
     , "crash_day_of_year" INTEGER
     , "geom" GEOMETRY
     , "geom_denver" GEOMETRY
-    , CONSTRAINT incident_id_pkey PRIMARY KEY (incident_id)
+    , CONSTRAINT row_id_pkey PRIMARY KEY (row_id)
 );
 
 CREATE INDEX crashes_geom_gist
@@ -33,7 +34,7 @@ CREATE INDEX crashes_geom_gist
   (geom)
   ;
 
-\copy crashes(incident_id,top_traffic_accident_offense,reported_date,incident_address_corrected,at_freeway,geo_lon,geo_lat,neighborhood_id,bicycle_ind,pedestrian_ind,day_or_night,driver_action,updated_at,sbi,fatality,sbi_or_fatality,crash_date,crash_date_str,crash_time_str,crash_year,crash_day_of_year) FROM '/Users/devin/Projects/denver-street-data/data/crash_data_preprocessed.csv' DELIMITERS ',' CSV HEADER;
+\copy crashes(row_id,incident_id,top_traffic_accident_offense,reported_date,incident_address_corrected,at_freeway,geo_lon,geo_lat,neighborhood_id,bicycle_ind,pedestrian_ind,day_or_night,driver_action,updated_at,sbi,fatality,sbi_or_fatality,crash_date,crash_date_str,crash_time_str,crash_year,crash_day_of_year) FROM '/Users/devin/Projects/denver-street-data/data/crash_data_preprocessed.csv' DELIMITERS ',' CSV HEADER;
 
 
 UPDATE crashes SET geom = ST_GeomFromText('POINT(' || geo_lon || ' ' || geo_lat || ')',4326);

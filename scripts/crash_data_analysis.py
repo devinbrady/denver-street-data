@@ -43,7 +43,8 @@ class CrashDataAnalysis():
         self.local_timezone = pytz.timezone('America/Denver')
 
         self.crash_table_fields = [
-            'incident_id'
+            'row_id'
+            , 'incident_id'
             , 'top_traffic_accident_offense'
             , 'reported_date'
             , 'incident_address_corrected'
@@ -129,6 +130,10 @@ class CrashDataAnalysis():
         if not all_columns:
             df = df[columns_to_read].copy()
 
+        start_id = 0
+        df.insert(0, 'row_id', range(start_id, start_id + len(df)))
+        print(df.head())
+
         df['bicycle_ind'] = df['bicycle_ind'].fillna(0)
         df['pedestrian_ind'] = df['pedestrian_ind'].fillna(0)
 
@@ -141,10 +146,11 @@ class CrashDataAnalysis():
         # df = pd.concat([df, crash_to_add], ignore_index=True)
 
 
-        # There's one bad row with a NULL incident_id
-        df = df[df.incident_id.notnull()].copy()
+        # There's one bad row with a NULL incident_id. Dec 2025 - not anymore
+        # df = df[df.incident_id.notnull()].copy()
 
-        df['incident_id'] = df['incident_id'].astype(int)
+        # As of Dec 2025, there are now letters in the incident_id field (they start with "DP")
+        # df['incident_id'] = df['incident_id'].astype(int)
 
         df['sbi'] = df['top_traffic_accident_offense'].str.contains('SBI')
         df['fatality'] = df['top_traffic_accident_offense'].str.contains('FATAL')
@@ -552,6 +558,18 @@ class CrashDataAnalysis():
 
         return gc.latlng
 
+
+
+    def confirm_key_uniqueness(self, df, primary_key):
+        """Throw an error if a primary key exists more than once in a table"""
+
+        key_count = df.groupby(primary_key).size()
+
+        if any(key_count > 1):
+            bad_key = key_count[key_count > 1]
+            raise ValueError(f'The primary key "{primary_key}" has at least one duplicate key in DataFrame (key "{bad_key.index.values[0]}")')
+        else:
+            print('Primary key is unique.')
 
 
 
