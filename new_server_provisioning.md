@@ -37,6 +37,23 @@
         shp2pgsql -s 4326 -I shapefiles/street_centerline/street_centerline.shp | psql -h "$PGHOST" -d "$PGDATABASE" -U "$PGUSERNAME" -p "$PGPORT"
         shp2pgsql -s 4326 -I shapefiles/intersections/intersections.shp | psql -h "$PGHOST" -d "$PGDATABASE" -U "$PGUSERNAME" -p "$PGPORT"
         shp2pgsql -s 4326 -I shapefiles/statistical_neighborhoods/statistical_neighborhoods.shp | psql -h "$PGHOST" -d "$PGDATABASE" -U "$PGUSERNAME" -p "$PGPORT"
+
+## Running in local Docker image
+
+1. Compose docker image
+
+    docker compose up --build
+
+2. Enter image
+
+    docker compose exec app bash
+
+3. Run data load script
+
+    python main.py -p
+
+I changed the hard-coded path here to work in the Docker container: sql/postgres_create_table_crashes.sql:37:
+
         
 ## Adding a Column
 

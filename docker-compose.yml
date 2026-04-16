@@ -10,3 +10,18 @@ services:
       - 5432:5432
     volumes:
       - ./data/postgis:/var/lib/postgresql/data
+
+  app:
+    build: .
+    depends_on:
+      - postgis
+    environment:
+      - PGHOST=postgis
+      - PGDATABASE=gis
+      - PGUSERNAME=gis
+      - PGPASSWORD=password
+      - PGPORT=5432
+    ports:
+      - 8888:8888
+    volumes:
+      - .:/app   # mount project so notebook changes persist

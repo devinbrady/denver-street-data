@@ -31,3 +31,17 @@ For definitions of the fields in the raw data, see the [Data Readme](data/README
 
 See the file [sql/query_examples.sql](sql/query_examples.sql) for some example queries. 
 
+## Fonts
+
+In 2026, I started using the Inter font, utilizing the `pyfonts` package.
+
+https://y-sunflower.github.io/pyfonts/
+
+https://fonts.google.com/specimen/Inter
+
+This code will set the font for every notebook:
+
+    from pyfonts import load_google_font, set_default_font
+
+    font = load_google_font("Inter")
+    set_default_font(font)

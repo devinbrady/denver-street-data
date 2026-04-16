@@ -132,7 +132,9 @@ class CrashDataAnalysis():
 
         start_id = 0
         df.insert(0, 'row_id', range(start_id, start_id + len(df)))
-        print(df.head())
+        
+        print('Sample data:')
+        print(df.sample(5).sort_values(by='reported_date'))
 
         df['bicycle_ind'] = df['bicycle_ind'].fillna(0)
         df['pedestrian_ind'] = df['pedestrian_ind'].fillna(0)
