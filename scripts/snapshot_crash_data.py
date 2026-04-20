@@ -1,253 +1,115 @@
 # snapshot_crash_data.py
 
-import os
 import pytz
 import time
-import shutil
-import string
-import random
-import hashlib
-import argparse
 import requests
-import subprocess
 import pandas as pd
-from pathlib import Path
 from datetime import datetime
 
 from scripts.crash_data_analysis import CrashDataAnalysis
 
 
-
 class SnapshotCrashData():
 
     def __init__(self):
-
-        # Hard code an input CSV
-        data_dir = Path('data')
-        self.input_file = self.most_recent_file(directory_path=data_dir, filename_pattern='crash_data_raw_')
-        # self.input_file = None
-
-        parser = argparse.ArgumentParser()
-        parser.add_argument('-f', '--download-force', action='store_true', help='Download a copy even if the remote header has not changed')
-        parser.add_argument('-p', '--postgres-force', action='store_true', help='Preprocess the local raw file and upload to postgres')
-        self.args = parser.parse_args()
-
-        self.files = {}
-        self.files['header_etag'] = data_dir / Path('header_etag_source.txt')
-        self.files['hash_local'] = data_dir / Path('data_hash_local.txt')
-        self.files['hash_postgres'] = data_dir / Path('data_hash_postgres.txt')
-        self.files['crash_data_raw'] = data_dir / Path('crash_data_raw.csv')
-        self.files['crash_data_preprocessed'] = data_dir / Path('crash_data_preprocessed.csv')
-
-        for file_key in list(self.files.keys()):
-            if not self.files[file_key].exists():
-                with open(self.files[file_key], 'w') as f:
-                    f.write(''.join(random.choices(string.ascii_lowercase, k=13)))
-
-        # self.url = 'https://www.denvergov.org/media/gis/DataCatalog/traffic_accidents/csv/traffic_accidents.csv'
-        self.url = 'https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/ODC_CRIME_TRAFFICACCIDENTS5YR_P/FeatureServer/325/query?outFields=*&where=1%3D1&f=geojson'
-
-        self.tz = pytz.timezone('America/Denver')
-
-        # Hour of day: '%-I:%M %p'
-        # Day of month, year: '%B %-d, %Y')
-        self.time_format_string = '%Y_%m_%d__%H_%M'
-
+        self.url = 'https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/ODC_CRIME_TRAFFICACCIDENTS5YR_P/FeatureServer/325/query'
+        self.page_size = 2000
+        self.max_records_to_get = 30000
+        self.seconds_to_wait = 5
         self.cda = CrashDataAnalysis()
 
-
-
-    def most_recent_file(self, directory_path, filename_pattern):
-        """
-        Returns the most recent file in a directory. 
-        The filenames must have a timestamp in them. It's the max of the sorted text.
-
-        directory_path: the directory to search in. pathlib Path object
-        filename_pattern: the text in the filename to narrow the results by
-
-        todo: this function is duplicated in crash_data_analysis
-        """
-
-        list_of_files = sorted(
-            [f for f in os.listdir(directory_path) if (
-                filename_pattern in f
-                and '~' not in f
-                )
-            ]
-            )
-
-        if len(list_of_files) == 0:
-            print(f'No files match the pattern "{filename_pattern}" in directory "{directory_path}".')
-            mrf = None
-        else:
-            mrf = directory_path / list_of_files[-1]
-
-        return mrf
-
-
-
-    def current_time(self):
-
-        now_local = datetime.now(self.tz)
-        
-        return now_local.strftime(self.time_format_string)
-
-
-
-    def remote_file_has_new_header(self):
-        """
-        Return True if the remote header has a ETag value that is different from the local version
-        """
-
-        with open(self.files['header_etag'], 'r') as f:
-            old_header_etag = f.read()
-
+    def get_latest_timestamp_utc(self):
+        """Return the most recent reported_date in postgres as a UTC datetime, or None if table is empty/missing."""
         try:
-            r = requests.head(self.url)
-        except Exception as e:
-            print('Something went wrong accessing the remote file, so we will not try to download it.')
-            return False
-        
-        # print('headers:')
-        # for k in r.headers:
-        #     print(k)
-        #     print(r.headers[k])
-        #     print()
+            latest = self.cda.most_recent_crash_timestamp_utc()
+            if latest is None:
+                return None
+            return latest.astimezone(pytz.utc)
+        except Exception:
+            return None
 
-        # self.remote_header_etag = r.headers['ETag']
-        self.remote_header_etag = str(random.random()) # force the download to happen every time
+    def fetch_new_records(self):
+        """Fetch records from ArcGIS API newer than what's already in postgres."""
 
-        if self.remote_header_etag == old_header_etag:
-            print('Source data matches local data.')
+        latest_utc = self.get_latest_timestamp_utc()
 
-        return self.remote_header_etag != old_header_etag
-        
-
-
-    def postgres_push_needed(self):
-        """
-        Return True if the local hash differs from what has previously been pushed to postgres
-        """
-
-        with open(self.files['hash_local'], 'r') as f:
-            hash_local = f.read()
-
-        with open(self.files['hash_postgres'], 'r') as f:
-            hash_postgres = f.read()
-
-        if hash_local == hash_postgres:
-            print('Local data matches postgres data.')
-
-        return hash_local != hash_postgres
-
-
-
-    def write_new_etag_to_file(self):
-        """Write the ETag from the remote header file to the local text file"""
-
-        with open(self.files['header_etag'], 'w') as f:
-            f.write(self.remote_header_etag)
-
-
-
-    def save_new_data_hash(self, df, file_path):
-        """
-        Save a hash of a dataframe to a file
-        """
-
-        df_hash = hashlib.sha256(pd.util.hash_pandas_object(df).values).hexdigest()
-
-        with open(file_path, 'w') as f:
-            f.write(df_hash)
-
-
-
-    def download_file(self):
-
-
-        if self.input_file:
-            print(f'Reading: {self.input_file}')
-            df = pd.read_csv(self.input_file, low_memory=False)
-        
+        if latest_utc is not None:
+            ts_str = latest_utc.strftime('%Y-%m-%d %H:%M:%S')
+            where_statement = f"reported_date > timestamp '{ts_str}'"
+            print(f'Fetching records after: {ts_str} UTC')
         else:
+            where_statement = '1=1'
+            print('No existing data found, fetching all records.')
 
-            # Download
-            print('Downloading data from denvergov... ', end='')
+        all_records = []
+        offset = 0
 
-            try:
-                df = gpd.read_file(self.url, low_memory=False)
-            except Exception as e:
-                print('Something went wrong trying to download the source data. Quitting.')
-                return
+        while True:
+            params = {
+                'where': where_statement,
+                'outFields': '*',
+                'resultRecordCount': self.page_size,
+                'resultOffset': offset,
+                'orderByFields': 'reported_date ASC',
+                'f': 'json',
+            }
 
-            print('complete.')
+            print(f'  Requesting offset {offset}...', end=' ')
+            r = requests.get(self.url, params=params)
+            r.raise_for_status()
+            data = r.json()
 
+            features = data.get('features', [])
+            print(f'{len(features)} records.')
 
-        df['updated_at'] = datetime.now(pytz.timezone('UTC')).isoformat()
+            if r.status_code != 200:
+                print(f'API returned error code: {r.status_code}')
+                print('Parameters:')
+                print(params)
+                print('Response:')
+                print(r.text)
+                break
 
-        df.to_csv(self.files['crash_data_raw'], index=False)
-        print(f"Raw data saved to: {self.files['crash_data_raw']}")
+            all_records.extend(f['attributes'] for f in features)
 
-        df_preprocessed = self.cda.preprocess_crash_data(df=df, verbose=False, all_columns=False)
+            if len(features) < self.page_size:
+                break
 
-        df_preprocessed.to_csv(self.files['crash_data_preprocessed'], index=False)
-        print(f"Preprocessed data saved to: {self.files['crash_data_preprocessed']}")
-
-        number_of_crashes = len(df)
-        print(f'Crashes in dataset: {number_of_crashes:,}')
-        print(f'First crash: {df_preprocessed.reported_date.min()}')
-        print(f' Last crash: {df_preprocessed.reported_date.max()}')
-        print(f" Last crash: {df_preprocessed.reported_date.max().strftime('%a %b %-d, %-I:%M %p')}")
-
-        self.write_new_etag_to_file()
-        self.save_new_data_hash(df_preprocessed[[c for c in df_preprocessed.columns if c != 'updated_at']], self.files['hash_local'])
-
-
-
-    def push_to_postgres(self):
-        """
-        Push the most recent local data to Postgres
-        """
-
-        start = time.perf_counter()
-
-        with subprocess.Popen(
-            f'psql -h {self.cda.pg_host} -d {self.cda.pg_database} -U {self.cda.pg_username} -p {self.cda.pg_port} -a -q -f sql/postgres_create_table_crashes.sql'
-            , shell=True
-            , stdout=subprocess.PIPE
-            ) as proc:
-
-            output = proc.stdout.read()
-
-        shutil.copyfile(self.files['hash_local'], self.files['hash_postgres'])
-
-        end = time.perf_counter()
-        seconds = (end-start)
-        print(f'Copy to Postgres complete. Elapsed time: {seconds:0.1f} seconds\n')
+            if len(all_records) >= self.max_records_to_get:
+                break
 
 
+            time.sleep(self.seconds_to_wait)
+
+            offset += self.page_size
+
+        if not all_records:
+            print('No new records found.')
+            return None
+
+        df = pd.DataFrame(all_records)
+
+        # ArcGIS returns dates as UTC epoch milliseconds
+        for col in ['reported_date', 'first_occurrence_date', 'last_occurrence_date']:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], unit='ms', utc=True)
+
+        df['updated_at'] = datetime.now(pytz.timezone('UTC'))
+
+        print(f'Total new records: {len(df):,}')
+        return df
 
     def run(self):
-
-        # current_timestamp = datetime.now(self.tz).strftime('%Y-%m-%d %H:%M:%S %Z')
-        # print(f'{current_timestamp} -> ', end='')
         print()
+        df = self.fetch_new_records()
 
-        if (self.remote_file_has_new_header()) or (self.args.download_force):
-            self.download_file()
+        if df is None:
+            return
 
-        if (self.postgres_push_needed() or self.args.postgres_force):
-            try:
-                self.push_to_postgres()
-            except Exception as e:
-                print('Push to remote postgres server failed with this error:')
-                print(e)
-                return
-
+        df_preprocessed = self.cda.preprocess_crash_data(df=df, verbose=True, all_columns=False)
+        self.cda.upsert_crashes(df_preprocessed)
 
 
 if __name__ == '__main__':
-
     scd = SnapshotCrashData()
     scd.run()
-

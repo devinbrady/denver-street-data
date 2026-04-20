@@ -43,8 +43,7 @@ class CrashDataAnalysis():
         self.local_timezone = pytz.timezone('America/Denver')
 
         self.crash_table_fields = [
-            'row_id'
-            , 'incident_id'
+            'incident_id'
             , 'top_traffic_accident_offense'
             , 'reported_date'
             , 'incident_address_corrected'
@@ -83,11 +82,51 @@ class CrashDataAnalysis():
 
 
     def most_recent_crash_timestamp(self):
-        """Return timestamp in local time showing the most recent crash in the dataset"""
+        """Return timestamp of the most recent crash in postgres, in Denver local time. Returns None if table is empty."""
 
-        return pd.to_datetime(
-            pd.read_sql('select max(reported_date) from crashes', self.conn).iloc[0].values[0]
-        ).tz_localize('UTC').tz_convert('America/Denver')
+        result = pd.read_sql('select max(reported_date) from crashes', self.conn).iloc[0].values[0]
+        if result is None:
+            return None
+        return pd.to_datetime(result).tz_localize('UTC').tz_convert('America/Denver')
+
+
+    def most_recent_crash_timestamp_utc(self):
+        """Return timestamp of the most recent crash in postgres, in UTC. Returns None if table is empty."""
+
+        result = pd.read_sql('select max(reported_date) from crashes', self.conn).iloc[0].values[0]
+        if result is None:
+            return None
+        return pd.to_datetime(result).tz_localize('UTC')
+
+
+
+    def upsert_crashes(self, df):
+        """Insert new crash records into postgres, updating existing rows on incident_id conflict."""
+
+        from sqlalchemy import text
+
+        cols = self.crash_table_fields
+        cols_quoted = ', '.join([f'"{c}"' for c in cols])
+        update_set = ', '.join([f'"{c}" = EXCLUDED."{c}"' for c in cols if c != 'incident_id'])
+
+        df[cols].to_sql('crashes_staging', self.conn, if_exists='replace', index=False)
+
+        with self.conn.connect() as conn:
+            conn.execute(text(f"""
+                INSERT INTO crashes ({cols_quoted})
+                SELECT {cols_quoted} FROM crashes_staging
+                ON CONFLICT (incident_id) DO UPDATE SET {update_set}
+            """))
+            conn.execute(text('DROP TABLE crashes_staging'))
+            conn.execute(text("""
+                UPDATE crashes SET
+                  geom = ST_GeomFromText('POINT(' || geo_lon || ' ' || geo_lat || ')', 4326),
+                  geom_denver = ST_Transform(ST_GeomFromText('POINT(' || geo_lon || ' ' || geo_lat || ')', 4326), 3502)
+                WHERE geo_lon IS NOT NULL AND geo_lat IS NOT NULL AND geom IS NULL
+            """))
+            conn.commit()
+
+        print(f'Upserted {len(df):,} records into crashes table.')
 
 
 
@@ -130,11 +169,12 @@ class CrashDataAnalysis():
         if not all_columns:
             df = df[columns_to_read].copy()
 
-        start_id = 0
-        df.insert(0, 'row_id', range(start_id, start_id + len(df)))
-        
-        print('Sample data:')
-        print(df.sample(5).sort_values(by='reported_date'))
+        # print('Sample data:')
+        # print(df.sample(5).sort_values(by='reported_date'))
+
+        print(f'Start date: {df.reported_date.min()}')
+        print(f'End date: {df.reported_date.max()}')
+
 
         df['bicycle_ind'] = df['bicycle_ind'].fillna(0)
         df['pedestrian_ind'] = df['pedestrian_ind'].fillna(0)
