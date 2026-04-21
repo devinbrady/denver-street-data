@@ -14,14 +14,14 @@ class SnapshotCrashData():
     def __init__(self):
         self.url = 'https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/ODC_CRIME_TRAFFICACCIDENTS5YR_P/FeatureServer/325/query'
         self.page_size = 2000
-        self.max_records_to_get = 30000
+        self.max_records_to_get = 50000
         self.seconds_to_wait = 5
         self.cda = CrashDataAnalysis()
 
     def get_latest_timestamp_utc(self):
         """Return the most recent reported_date in postgres as a UTC datetime, or None if table is empty/missing."""
         try:
-            latest = self.cda.most_recent_crash_timestamp_utc()
+            latest = self.cda.most_recent_crash_timestamp()
             if latest is None:
                 return None
             return latest.astimezone(pytz.utc)
@@ -89,10 +89,14 @@ class SnapshotCrashData():
 
         df = pd.DataFrame(all_records)
 
-        # ArcGIS returns dates as UTC epoch milliseconds
+        # ArcGIS returns dates as epoch milliseconds in Denver local time
         for col in ['reported_date', 'first_occurrence_date', 'last_occurrence_date']:
             if col in df.columns:
-                df[col] = pd.to_datetime(df[col], unit='ms', utc=True)
+                df[col] = (
+                    pd.to_datetime(df[col], unit='ms', utc=False)
+                    .dt.tz_localize('America/Denver', ambiguous=True, nonexistent='shift_forward')
+                    .dt.tz_convert('UTC')
+                    )
 
         df['updated_at'] = datetime.now(pytz.timezone('UTC'))
 

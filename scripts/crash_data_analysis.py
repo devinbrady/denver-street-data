@@ -80,7 +80,6 @@ class CrashDataAnalysis():
         return conn
 
 
-
     def most_recent_crash_timestamp(self):
         """Return timestamp of the most recent crash in postgres, in Denver local time. Returns None if table is empty."""
 
@@ -88,16 +87,6 @@ class CrashDataAnalysis():
         if result is None:
             return None
         return pd.to_datetime(result).tz_localize('UTC').tz_convert('America/Denver')
-
-
-    def most_recent_crash_timestamp_utc(self):
-        """Return timestamp of the most recent crash in postgres, in UTC. Returns None if table is empty."""
-
-        result = pd.read_sql('select max(reported_date) from crashes', self.conn).iloc[0].values[0]
-        if result is None:
-            return None
-        return pd.to_datetime(result).tz_localize('UTC')
-
 
 
     def upsert_crashes(self, df):
@@ -251,11 +240,11 @@ class CrashDataAnalysis():
         if verbose:
 
             updated_at = df['updated_at'].dt.tz_convert(self.local_timezone).max()
-            updated_at_str = updated_at.strftime('%a %b %-d, %-I:%M %p')
+            updated_at_str = updated_at.strftime('%a %b %-d %Y, %-I:%M %p %Z')
             print(f'Local database updated at: {updated_at_str}')
 
             max_timestamp = df[date_field_name].max()
-            max_timestamp_str = max_timestamp.strftime('%a %b %-d, %-I:%M %p')
+            max_timestamp_str = max_timestamp.strftime('%a %b %-d %Y, %-I:%M %p %Z')
 
             days_ago = (self.denver_timestamp() - max_timestamp).total_seconds() / 60 / 60 / 24
 

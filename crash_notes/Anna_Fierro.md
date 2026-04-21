@@ -6,3 +6,4 @@ incident id 2025225957
 
 Scooter is listed as "pedestrian_ind"
 
+Occurred around 9pm Mountain Time

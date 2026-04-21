@@ -15,7 +15,7 @@ It shows that deadly crashes stopped at the onset of the pandemic in 2020 (green
 
 ## Data Source
 
-The data comes from the "Traffic Accidents" dataset maintained by the City of Denver: [https://denvergov.org/opendata/dataset/city-and-county-of-denver-traffic-accidents](https://denvergov.org/opendata/dataset/city-and-county-of-denver-traffic-accidents)
+The data comes from the "Traffic Accidents" dataset maintained by the City of Denver: [ArcGIS](https://opendata-geospatialdenver.hub.arcgis.com/datasets/geospatialDenver::traffic-accidents-offenses/about)
 
 ## Data Quirks
 

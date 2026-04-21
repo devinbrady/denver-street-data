@@ -44,6 +44,10 @@
 
     docker compose up --build
 
+2. Create database
+
+    docker compose exec -T postgis psql -U gis -d gis < sql/postgres_create_table_crashes.sql
+
 2. Enter image
 
     docker compose exec app bash
@@ -51,6 +55,10 @@
 3. Run data load script
 
     python main.py -p
+
+Steps 2 and 3 combined
+
+    docker compose exec app python main.py
 
 I changed the hard-coded path here to work in the Docker container: sql/postgres_create_table_crashes.sql:37:
 
